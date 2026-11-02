@@ -1,0 +1,565 @@
+{
+  "generatedAt": "2026-11-01T18:49:06.729Z",
+  "mode": "live",
+  "fixtures": {
+    "version": "1.0",
+    "description": "10 synthetic evaluation cases for ProofCase refund-cap invariant. Six supported paraphrases, two ambiguous, two unsupported. Expected labels established BEFORE any model call.",
+    "supportedVocabulary": "refund-cap invariant: Total accepted refunds for an order cannot exceed captured payment. Allowed ops: createOrder {orderId, capturedCents}, requestRefund {orderId, amountCents, refundId}, assertTotalRefunds {orderId, expectedCents}, assertRefundStatus {refundId, expectedStatus}. Bounds: capturedCents 1..1000000, amountCents 1..1000000, max 8 ops, IDs ^[A-Za-z0-9_-]{1,32}$, expectedStatus accepted|rejected. Invariant: sum(accepted refunds per order) <= capturedCents.",
+    "maxCases": 10,
+    "createdAt": "2026-11-01T00:00:00.000Z",
+    "disclaimer": "Ten synthetic cases are NOT a general benchmark. They test paraphrase robustness, ambiguity handling, and out-of-vocabulary rejection within the bounded refund-cap demo only.",
+    "humanReviewPolicy": "For supported cases, JSON validity alone is insufficient. Auto-checks verify operation shapes and exceed-cap demonstration, but semantic correctness requires human confirmation that interpretedRule accurately restates cumulative cap. pending-human-review is NOT counted as pass."
+  },
+  "providerCaps": {
+    "maxCases": 10,
+    "maxAttemptsPerCase": 2,
+    "maxTotalPaidRequests": 20,
+    "actualPaidAttempts": 10
+  },
+  "summary": {
+    "totalCases": 10,
+    "mode": "live",
+    "maxPossiblePaidRequests": 20,
+    "actualPaidAttempts": 10,
+    "counts": {
+      "expectedSupported": 6,
+      "expectedAmbiguous": 2,
+      "expectedUnsupported": 2,
+      "actualSupported": 6,
+      "actualUnsupported": 2,
+      "actualModelError": 2,
+      "jsonValid": 8,
+      "semanticPass": 2,
+      "semanticPending": 4,
+      "semanticFail": 4,
+      "executesValidly": 4,
+      "exposesDefect": 4
+    },
+    "disclaimer": "Ten synthetic cases are not a general benchmark. See docs/EVALUATION.md.",
+    "humanReviewPolicy": "pending-human-review is NOT counted as pass. JSON validity != semantic correctness."
+  },
+  "results": [
+    {
+      "caseId": "SUP-01",
+      "submittedRequirement": "Total accepted refunds for an order cannot exceed captured payment.",
+      "expectedClassification": "supported",
+      "actualModelClassification": "supported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": true,
+        "reason": "VALID",
+        "unsupported": false
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": "pending-human-review",
+      "humanReview": {
+        "required": true,
+        "status": "pending-human-review",
+        "note": "Auto checks pass; human must confirm interpretedRule accurately paraphrases cumulative cap. NOT counted as pass until approved."
+      },
+      "executesValidly": true,
+      "exposesSeededDefect": true,
+      "providerLatencyMs": 8747,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": null,
+      "planSummary": {
+        "ruleId": "refund-cap",
+        "interpretedRule": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+        "operations": [
+          {
+            "op": "createOrder",
+            "orderId": "order-1",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 4000,
+            "refundId": "r1"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r1",
+            "expectedStatus": "accepted"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 7000,
+            "refundId": "r2"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r2",
+            "expectedStatus": "rejected"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "SUP-02",
+      "submittedRequirement": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+      "expectedClassification": "supported",
+      "actualModelClassification": "supported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": true,
+        "reason": "VALID",
+        "unsupported": false
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": "pending-human-review",
+      "humanReview": {
+        "required": true,
+        "status": "pending-human-review",
+        "note": "Auto checks pass; human must confirm interpretedRule accurately paraphrases cumulative cap. NOT counted as pass until approved."
+      },
+      "executesValidly": true,
+      "exposesSeededDefect": true,
+      "providerLatencyMs": 8325,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": null,
+      "planSummary": {
+        "ruleId": "refund-cap",
+        "interpretedRule": "The total amount of all accepted refunds for an order must not exceed its captured payment amount.",
+        "operations": [
+          {
+            "op": "createOrder",
+            "orderId": "order-1",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 4000,
+            "refundId": "r1"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r1",
+            "expectedStatus": "accepted"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 7000,
+            "refundId": "r2"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r2",
+            "expectedStatus": "rejected"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "SUP-03",
+      "submittedRequirement": "An order accepted refunds in total must stay within its captured payment limit.",
+      "expectedClassification": "supported",
+      "actualModelClassification": "model_error",
+      "returnedModelId": null,
+      "structuredPlanValidationResult": {
+        "ok": false,
+        "reason": "MODEL_ERROR",
+        "message": "Model output truncated (finish_reason=length, budget=4096). No answer fabricated.",
+        "unsupported": false
+      },
+      "jsonValid": false,
+      "semanticCorrectAfterReview": false,
+      "humanReview": {
+        "required": false,
+        "status": "model_error",
+        "note": "Model call failed; no semantic success fabricated"
+      },
+      "executesValidly": "not-executed-per-integrity",
+      "exposesSeededDefect": "not-applicable",
+      "providerLatencyMs": 12955,
+      "tokenUsage": null,
+      "providerFinishReason": null,
+      "failureReason": "MODEL_ERROR: Model output truncated (finish_reason=length, budget=4096). No answer fabricated.",
+      "planSummary": {}
+    },
+    {
+      "caseId": "SUP-04",
+      "submittedRequirement": "Cumulative accepted refund amount per order must not surpass the captured funds.",
+      "expectedClassification": "supported",
+      "actualModelClassification": "supported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": true,
+        "reason": "VALID",
+        "unsupported": false
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": "pending-human-review",
+      "humanReview": {
+        "required": true,
+        "status": "pending-human-review",
+        "note": "Auto checks pass; human must confirm interpretedRule accurately paraphrases cumulative cap. NOT counted as pass until approved."
+      },
+      "executesValidly": true,
+      "exposesSeededDefect": true,
+      "providerLatencyMs": 8812,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": null,
+      "planSummary": {
+        "ruleId": "refund-cap",
+        "interpretedRule": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+        "operations": [
+          {
+            "op": "createOrder",
+            "orderId": "order-1",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 4000,
+            "refundId": "r1"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r1",
+            "expectedStatus": "accepted"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 7000,
+            "refundId": "r2"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r2",
+            "expectedStatus": "rejected"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "SUP-05",
+      "submittedRequirement": "For any order, the total of approved refunds cannot be more than what was captured.",
+      "expectedClassification": "supported",
+      "actualModelClassification": "supported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": true,
+        "reason": "VALID",
+        "unsupported": false
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": "pending-human-review",
+      "humanReview": {
+        "required": true,
+        "status": "pending-human-review",
+        "note": "Auto checks pass; human must confirm interpretedRule accurately paraphrases cumulative cap. NOT counted as pass until approved."
+      },
+      "executesValidly": true,
+      "exposesSeededDefect": true,
+      "providerLatencyMs": 6331,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": null,
+      "planSummary": {
+        "ruleId": "refund-cap",
+        "interpretedRule": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+        "operations": [
+          {
+            "op": "createOrder",
+            "orderId": "order-1",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 4000,
+            "refundId": "r1"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r1",
+            "expectedStatus": "accepted"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 7000,
+            "refundId": "r2"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r2",
+            "expectedStatus": "rejected"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "SUP-06",
+      "submittedRequirement": "Accepted refunds aggregated for an order must be capped at the captured payment value.",
+      "expectedClassification": "supported",
+      "actualModelClassification": "model_error",
+      "returnedModelId": null,
+      "structuredPlanValidationResult": {
+        "ok": false,
+        "reason": "MODEL_ERROR",
+        "message": "Model output truncated (finish_reason=length, budget=4096). No answer fabricated.",
+        "unsupported": false
+      },
+      "jsonValid": false,
+      "semanticCorrectAfterReview": false,
+      "humanReview": {
+        "required": false,
+        "status": "model_error",
+        "note": "Model call failed; no semantic success fabricated"
+      },
+      "executesValidly": "not-executed-per-integrity",
+      "exposesSeededDefect": "not-applicable",
+      "providerLatencyMs": 10853,
+      "tokenUsage": null,
+      "providerFinishReason": null,
+      "failureReason": "MODEL_ERROR: Model output truncated (finish_reason=length, budget=4096). No answer fabricated.",
+      "planSummary": {}
+    },
+    {
+      "caseId": "AMB-01",
+      "submittedRequirement": "Refunds should not be too large.",
+      "expectedClassification": "ambiguous",
+      "actualModelClassification": "supported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": true,
+        "reason": "VALID",
+        "unsupported": false
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": false,
+      "humanReview": {
+        "required": false,
+        "status": "failed",
+        "note": "Model supplied valid plan for unsupported/ambiguous requirement — semantic failure (hallucination)"
+      },
+      "executesValidly": "not-executed-per-integrity",
+      "exposesSeededDefect": "not-applicable",
+      "providerLatencyMs": 9427,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": "SEMANTIC_FAILURE: unsupported requirement incorrectly produced executable plan",
+      "planSummary": {
+        "ruleId": "refund-cap",
+        "interpretedRule": "The sum of accepted refunds for an order must never exceed its captured payment amount.",
+        "operations": [
+          {
+            "op": "createOrder",
+            "orderId": "order-1",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 4000,
+            "refundId": "r1"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r1",
+            "expectedStatus": "accepted"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          },
+          {
+            "op": "createOrder",
+            "orderId": "order-2",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-2",
+            "amountCents": 6000,
+            "refundId": "r2"
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-2",
+            "amountCents": 5000,
+            "refundId": "r3"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r3",
+            "expectedStatus": "rejected"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "AMB-02",
+      "submittedRequirement": "Handle refunds correctly according to business policy.",
+      "expectedClassification": "ambiguous",
+      "actualModelClassification": "supported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": true,
+        "reason": "VALID",
+        "unsupported": false
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": false,
+      "humanReview": {
+        "required": false,
+        "status": "failed",
+        "note": "Model supplied valid plan for unsupported/ambiguous requirement — semantic failure (hallucination)"
+      },
+      "executesValidly": "not-executed-per-integrity",
+      "exposesSeededDefect": "not-applicable",
+      "providerLatencyMs": 4096,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": "SEMANTIC_FAILURE: unsupported requirement incorrectly produced executable plan",
+      "planSummary": {
+        "ruleId": "refund-cap",
+        "interpretedRule": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+        "operations": [
+          {
+            "op": "createOrder",
+            "orderId": "order-1",
+            "capturedCents": 10000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 4000,
+            "refundId": "r1"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r1",
+            "expectedStatus": "accepted"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          },
+          {
+            "op": "requestRefund",
+            "orderId": "order-1",
+            "amountCents": 7000,
+            "refundId": "r2"
+          },
+          {
+            "op": "assertRefundStatus",
+            "refundId": "r2",
+            "expectedStatus": "rejected"
+          },
+          {
+            "op": "assertTotalRefunds",
+            "orderId": "order-1",
+            "expectedCents": 4000
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "UNS-01",
+      "submittedRequirement": "Refund requests must be processed within 24 hours of submission.",
+      "expectedClassification": "unsupported",
+      "actualModelClassification": "unsupported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": false,
+        "reason": "UNSUPPORTED_REQUIREMENT",
+        "message": "Business requirement is a time-based SLA (refund processed within 24 hours) but allowed catalog (createOrder, requestRefund, assertTotalRefunds, assertRefundStatus) has no time, timestamp, delay, or duration fields/operations to assert processing time.",
+        "unsupported": true
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": true,
+      "humanReview": {
+        "required": false,
+        "status": "n/a",
+        "note": "Correctly returned unsupported for out-of-vocabulary/ambiguous requirement"
+      },
+      "executesValidly": "not-executed-per-integrity",
+      "exposesSeededDefect": "not-applicable",
+      "providerLatencyMs": 3072,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": null,
+      "planSummary": {}
+    },
+    {
+      "caseId": "UNS-02",
+      "submittedRequirement": "Customers should receive an email confirmation after each refund is issued.",
+      "expectedClassification": "unsupported",
+      "actualModelClassification": "unsupported",
+      "returnedModelId": "meta-models/muse-spark-open-1026",
+      "structuredPlanValidationResult": {
+        "ok": false,
+        "reason": "UNSUPPORTED_REQUIREMENT",
+        "message": "Business requirement requires verifying email confirmation delivery, but allowed operations catalog only supports createOrder, requestRefund, assertTotalRefunds, and assertRefundStatus with no capability to observe or assert email notifications.",
+        "unsupported": true
+      },
+      "jsonValid": true,
+      "semanticCorrectAfterReview": true,
+      "humanReview": {
+        "required": false,
+        "status": "n/a",
+        "note": "Correctly returned unsupported for out-of-vocabulary/ambiguous requirement"
+      },
+      "executesValidly": "not-executed-per-integrity",
+      "exposesSeededDefect": "not-applicable",
+      "providerLatencyMs": 2685,
+      "tokenUsage": null,
+      "providerFinishReason": "stop",
+      "failureReason": null,
+      "planSummary": {}
+    }
+  ]
+}

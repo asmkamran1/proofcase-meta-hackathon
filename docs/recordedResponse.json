@@ -1,0 +1,53 @@
+{
+  "plan": {
+    "version": "1.0",
+    "ruleId": "refund-cap",
+    "businessRequirement": "Total accepted refunds for an order cannot exceed captured payment.",
+    "interpretedRule": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+    "operations": [
+      {
+        "op": "createOrder",
+        "orderId": "order-1",
+        "capturedCents": 10000
+      },
+      {
+        "op": "requestRefund",
+        "orderId": "order-1",
+        "amountCents": 4000,
+        "refundId": "r1"
+      },
+      {
+        "op": "assertRefundStatus",
+        "refundId": "r1",
+        "expectedStatus": "accepted"
+      },
+      {
+        "op": "assertTotalRefunds",
+        "orderId": "order-1",
+        "expectedCents": 4000
+      },
+      {
+        "op": "requestRefund",
+        "orderId": "order-1",
+        "amountCents": 7000,
+        "refundId": "r2"
+      },
+      {
+        "op": "assertRefundStatus",
+        "refundId": "r2",
+        "expectedStatus": "rejected"
+      },
+      {
+        "op": "assertTotalRefunds",
+        "orderId": "order-1",
+        "expectedCents": 4000
+      }
+    ]
+  },
+  "_diag": {
+    "modelId": "meta-models/muse-spark-open-1026",
+    "finishReason": "stop",
+    "capturedAt": "2026-10-29T03:58:40.221Z"
+  },
+  "source": "live-verified"
+}

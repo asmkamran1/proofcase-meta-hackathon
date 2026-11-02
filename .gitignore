@@ -1,0 +1,25 @@
+# Secrets -- never commit real credentials
+.env.local
+.env
+.env.*.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+
+# Logs and temp files
+npm-debug.log*
+*.log
+.tmp/
+temp/
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+*.swp
+*~

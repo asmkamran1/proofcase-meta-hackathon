@@ -1,0 +1,14 @@
+{
+  "name": "proofcase-meta-hackathon",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "feasibility": "node scripts/runFeasibility.js",
+    "start": "node src/server.js",
+    "dev": "node --env-file=.env.local src/server.js"
+  }
+}

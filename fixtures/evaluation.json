@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "10 synthetic evaluation cases for ProofCase refund-cap invariant. Six supported paraphrases, two ambiguous, two unsupported. Expected labels established BEFORE any model call.",
+    "supportedVocabulary": "refund-cap invariant: Total accepted refunds for an order cannot exceed captured payment. Allowed ops: createOrder {orderId, capturedCents}, requestRefund {orderId, amountCents, refundId}, assertTotalRefunds {orderId, expectedCents}, assertRefundStatus {refundId, expectedStatus}. Bounds: capturedCents 1..1000000, amountCents 1..1000000, max 8 ops, IDs ^[A-Za-z0-9_-]{1,32}$, expectedStatus accepted|rejected. Invariant: sum(accepted refunds per order) <= capturedCents.",
+    "maxCases": 10,
+    "createdAt": "2026-11-01T00:00:00.000Z",
+    "disclaimer": "Ten synthetic cases are NOT a general benchmark. They test paraphrase robustness, ambiguity handling, and out-of-vocabulary rejection within the bounded refund-cap demo only.",
+    "humanReviewPolicy": "For supported cases, JSON validity alone is insufficient. Auto-checks verify operation shapes and exceed-cap demonstration, but semantic correctness requires human confirmation that interpretedRule accurately restates cumulative cap. pending-human-review is NOT counted as pass."
+  },
+  "cases": [
+    {
+      "id": "SUP-01",
+      "requirement": "Total accepted refunds for an order cannot exceed captured payment.",
+      "expectedClassification": "supported",
+      "expectedSemantics": {
+        "summary": "Canonical cumulative cap: sum of accepted refunds per order must be <= capturedCents. Plan should demonstrate single accepted refund then second refund that collectively exceeds cap and is rejected.",
+        "ruleId": "refund-cap",
+        "requiredOps": [
+          "createOrder",
+          "requestRefund",
+          "assertRefundStatus",
+          "assertTotalRefunds"
+        ],
+        "mustExceedCap": true,
+        "minRequestRefunds": 2,
+        "mustIncludeAcceptedAndRejected": true,
+        "humanReviewNote": "Verify interpretedRule mentions cumulative/total/sum and captured payment, not single-refund limit."
+      }
+    },
+    {
+      "id": "SUP-02",
+      "requirement": "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+      "expectedClassification": "supported",
+      "expectedSemantics": {
+        "summary": "Paraphrase of cumulative cap using sum/never exceed language. Same expectations as SUP-01.",
+        "ruleId": "refund-cap",
+        "requiredOps": [
+          "createOrder",
+          "requestRefund",
+          "assertRefundStatus",
+          "assertTotalRefunds"
+        ],
+        "mustExceedCap": true,
+        "minRequestRefunds": 2,
+        "mustIncludeAcceptedAndRejected": true,
+        "humanReviewNote": "Check paraphrase preserves per-order total vs captured, not per-refund ceiling."
+      }
+    },
+    {
+      "id": "SUP-03",
+      "requirement": "An order accepted refunds in total must stay within its captured payment limit.",
+      "expectedClassification": "supported",
+      "expectedSemantics": {
+        "summary": "Paraphrase with within/limit wording. Should still map to cumulative cap.",
+        "ruleId": "refund-cap",
+        "requiredOps": [
+          "createOrder",
+          "requestRefund",
+          "assertRefundStatus",
+          "assertTotalRefunds"
+        ],
+        "mustExceedCap": true,
+        "minRequestRefunds": 2,
+        "mustIncludeAcceptedAndRejected": true,
+        "humanReviewNote": "Ensure limit interpreted as capturedCents, not arbitrary threshold."
+      }
+    },
+    {
+      "id": "SUP-04",
+      "requirement": "Cumulative accepted refund amount per order must not surpass the captured funds.",
+      "expectedClassification": "supported",
+      "expectedSemantics": {
+        "summary": "Cumulative/surpass phrasing. Supported vocabulary.",
+        "ruleId": "refund-cap",
+        "requiredOps": [
+          "createOrder",
+          "requestRefund",
+          "assertRefundStatus",
+          "assertTotalRefunds"
+        ],
+        "mustExceedCap": true,
+        "minRequestRefunds": 2,
+        "mustIncludeAcceptedAndRejected": true,
+        "humanReviewNote": "Confirm cumulative semantics retained."
+      }
+    },
+    {
+      "id": "SUP-05",
+      "requirement": "For any order, the total of approved refunds cannot be more than what was captured.",
+      "expectedClassification": "supported",
+      "expectedSemantics": {
+        "summary": "Approved vs accepted synonym, total/captured phrasing. Should map to refund-cap.",
+        "ruleId": "refund-cap",
+        "requiredOps": [
+          "createOrder",
+          "requestRefund",
+          "assertRefundStatus",
+          "assertTotalRefunds"
+        ],
+        "mustExceedCap": true,
+        "minRequestRefunds": 2,
+        "mustIncludeAcceptedAndRejected": true,
+        "humanReviewNote": "Verify approved treated as accepted, not separate workflow."
+      }
+    },
+    {
+      "id": "SUP-06",
+      "requirement": "Accepted refunds aggregated for an order must be capped at the captured payment value.",
+      "expectedClassification": "supported",
+      "expectedSemantics": {
+        "summary": "Aggregated/capped phrasing. Supported.",
+        "ruleId": "refund-cap",
+        "requiredOps": [
+          "createOrder",
+          "requestRefund",
+          "assertRefundStatus",
+          "assertTotalRefunds"
+        ],
+        "mustExceedCap": true,
+        "minRequestRefunds": 2,
+        "mustIncludeAcceptedAndRejected": true,
+        "humanReviewNote": "Check capped interpreted as <= captured, not strict <."
+      }
+    },
+    {
+      "id": "AMB-01",
+      "requirement": "Refunds should not be too large.",
+      "expectedClassification": "ambiguous",
+      "expectedSemantics": {
+        "summary": "Missing essential condition: no definition of limit (captured payment) or scope (per order total). Should be treated as ambiguous/unsupported, not fabricated into valid plan.",
+        "shouldReturnUnsupported": true,
+        "reasonHint": "Requirement lacks quantifiable limit and per-order aggregation scope.",
+        "humanReviewNote": "If model fabricates captured=10000 and exceed scenario, that is semantic failure — hallucinated missing condition."
+      }
+    },
+    {
+      "id": "AMB-02",
+      "requirement": "Handle refunds correctly according to business policy.",
+      "expectedClassification": "ambiguous",
+      "expectedSemantics": {
+        "summary": "No essential business condition stated. No limit, no invariant. Should be unsupported.",
+        "shouldReturnUnsupported": true,
+        "reasonHint": "Vague policy reference provides no testable invariant.",
+        "humanReviewNote": "Model must not invent refund-cap rule when none specified."
+      }
+    },
+    {
+      "id": "UNS-01",
+      "requirement": "Refund requests must be processed within 24 hours of submission.",
+      "expectedClassification": "unsupported",
+      "expectedSemantics": {
+        "summary": "Outside bounded vocabulary: temporal processing SLA, not cumulative refund cap. No catalog operation can test timing.",
+        "shouldReturnUnsupported": true,
+        "reasonHint": "Catalog has no time/SLA operations; only financial invariant ops.",
+        "humanReviewNote": "If model returns valid financial plan for timing rule, classify as semantic failure (hallucination)."
+      }
+    },
+    {
+      "id": "UNS-02",
+      "requirement": "Customers should receive an email confirmation after each refund is issued.",
+      "expectedClassification": "unsupported",
+      "expectedSemantics": {
+        "summary": "Outside vocabulary: email notification, not refund-cap. Unsupported.",
+        "shouldReturnUnsupported": true,
+        "reasonHint": "No email operation in catalog; cannot express.",
+        "humanReviewNote": "Valid plan for email rule is semantic failure."
+      }
+    }
+  ]
+}

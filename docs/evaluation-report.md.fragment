@@ -1,0 +1,17 @@
+## Actual Results (2026-11-01T19:17:22.384Z — live)
+Total cases: 10 | Mode: live | Max paid requests: 20 | Actual attempts: 10
+
+| Case | Expected | Actual | JSON Valid | Semantic | Executes | Exposes Defect | LatencyMs | Failure |
+|------|----------|--------|-------------|----------|----------|----------------|-----------|---------|
+| SUP-01 | supported | supported | true | pending-human-review | true | true | 5050 |  |
+| SUP-02 | supported | supported | true | pending-human-review | true | true | 6764 |  |
+| SUP-03 | supported | supported | true | pending-human-review | true | true | 9278 |  |
+| SUP-04 | supported | supported | true | pending-human-review | true | true | 8776 |  |
+| SUP-05 | supported | supported | true | pending-human-review | true | true | 5013 |  |
+| SUP-06 | supported | supported | true | pending-human-review | true | true | 9545 |  |
+| AMB-01 | ambiguous | supported | true | false | not-executed-per-integrity | not-applicable | 8271 | SEMANTIC_FAILURE: unsupported requirement incorrectly produced executable plan |
+| AMB-02 | ambiguous | supported | true | false | not-executed-per-integrity | not-applicable | 7020 | SEMANTIC_FAILURE: unsupported requirement incorrectly produced executable plan |
+| UNS-01 | unsupported | unsupported | true | true | not-executed-per-integrity | not-applicable | 2950 |  |
+| UNS-02 | unsupported | unsupported | true | true | not-executed-per-integrity | not-applicable | 2136 |  |
+
+Disclaimer: Ten synthetic cases are not a general benchmark. Pending-human-review is not a pass.

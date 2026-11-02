@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "purpose": "Append-only human review log without altering frozen fixture labels or archived reports",
+  "policy": "Do not edit fixtures/evaluation.json expectedClassification or docs/archive/*. Pending-human-review not counted as pass. Ambiguous->unsupported is safe abstention not exact success. Provider errors separate.",
+  "entries": [
+    {
+      "caseId": "SUP-01",
+      "expected": "supported",
+      "actual": "supported",
+      "gate": "VALID",
+      "humanReview": "pending-human-review",
+      "reviewer": null,
+      "reviewedAt": null,
+      "decision": null,
+      "rationale": "Gate passed pillars; needs human confirm interpretedRule"
+    },
+    {
+      "caseId": "AMB-01",
+      "requirement": "Refunds should not be too large.",
+      "expected": "ambiguous",
+      "actual": "supported (hallucinated pre-fix)",
+      "gate": "NEEDS_INPUT",
+      "missing": [
+        "cumulative_scope",
+        "per_order_scope",
+        "captured_payment_bound"
+      ],
+      "humanReview": "semantic_fail",
+      "reviewer": "system gate",
+      "reviewedAt": "2026-11-01T00:00:00.000Z",
+      "decision": "reject",
+      "rationale": "Requirement missing essential invariant pillars; vague too large not sufficient"
+    },
+    {
+      "caseId": "AMB-02",
+      "requirement": "Handle refunds correctly according to business policy.",
+      "expected": "ambiguous",
+      "actual": "supported (hallucinated pre-fix)",
+      "gate": "NEEDS_INPUT",
+      "missing": [
+        "cumulative_scope",
+        "accepted_refunds",
+        "per_order_scope",
+        "captured_payment_bound"
+      ],
+      "humanReview": "semantic_fail",
+      "reviewer": "system gate",
+      "reviewedAt": "2026-11-01T00:00:00.000Z",
+      "decision": "reject",
+      "rationale": "No business condition stated; gate blocks and requires explicit input"
+    }
+  ]
+}

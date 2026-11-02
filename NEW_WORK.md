@@ -46,14 +46,20 @@ seeded and fictional.
   (per-refund check only) and corrected (cumulative) variants.
 - `src/executor.js` — deterministic switch on allowlisted ops only;
   requires approved===true; never evals model JS.
-- `src/semanticGate.js` — (Sprint 3.1) 4-pillar gate: cumulative, accepted,
+- `src/semanticGate.js` — 4-pillar gate: cumulative, accepted,
   per-order, captured. Checks requirement, interpretedRule, and plan
-  exceed-cap shape. Enforced in server + evaluator.
-- `src/approval.js` — (Sprint 2) SHA-256 approvalHash over requirement+plan
-  and verifyApproval to invalidate stale tokens.
-- `src/server.js` — (Sprint 2/3.1) Node http server: /api/config,
-  /api/recorded, /api/interpret (gate + token), /api/run (re-gate +
-  verify + dual execution + JSON report), static public/.
+  exceed-cap shape. Hardened fail-closed: reversed exceed, strict
+  less-than, equality, and vague-cap language rejected. Enforced in
+  server + evaluator.
+- `src/approval.js` — server-issued HMAC execution authorization
+  (per-instance random key, 15-minute TTL, constant-time checks).
+  Binds canonical requirement + normalized plan + provenance +
+  modelId. Legacy unsigned hashes cannot authorize `/api/run`.
+  Authorization is not human identity authentication.
+- `src/server.js` — loopback-only Node http server (127.0.0.1):
+  /api/config, /api/recorded, /api/interpret (gate + HMAC issue),
+  /api/run (re-gate + verify + dual execution + JSON report),
+  static public/ with traversal/symlink fail-closed handling.
 - `public/` — Minimal UI: requirement textarea, Interpret/Recorded,
   interpreted rule, sequential timeline, buggy vs corrected traces +
   invariant banner, currency formatting, approval hint, JSON export.
@@ -65,8 +71,10 @@ seeded and fictional.
   (exact vs safe-abstention vs providerError), archive of prior live.
 - `scripts/runFeasibility.js` — (Sprint 1) Feasibility runner: real Meta
   call -> validate -> approve -> dual execution -> docs/MODEL_RUN.md.
-- `test/` (7 files) — validator, planner, refundService, executor,
-  sprint2, evaluation, sprint3.1, timeline.
+- `test/` (12 files) — validator, planner, refundService, executor,
+  sprint2, evaluation, sprint3.1, timeline, plus H1/H2/H3 hardening:
+  http-security (16), approval-security (18), recorded-gate (16),
+  hardening-regression (5). Full suite: 111/111 pass at H3 close.
 - `docs/MODEL_RUN.md` — verbatim model output + dual execution evidence.
 - `docs/recordedResponse.json` — 7-op Muse Spark plan + _diag captured
   2026-10-29, served as reproducible recorded replay.

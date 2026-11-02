@@ -11,11 +11,18 @@ node --version   # >=20
 npm --version
 ```
 
-## 1. Full Test Suite
+## 1. Full Test Suite (111 tests, all green per 2026-11-02 H3 run)
 
 ```powershell
 node --test test/
-# expect: all suites green (validator, planner, executor, sprint2, evaluation, sprint3.1, timeline, refundService)
+# expect: 111/111 pass, 0 fail, 0 skipped, 0 cancelled.
+# Breakdown: approval-security 18, evaluation 10, executor 4,
+# hardening-regression (H3) 5, http-security 16, planner 3,
+# recorded-gate 16, refundService 2, sprint2 11, sprint3.1 14,
+# timeline 8, validator 4.
+# Reconciles the prior H2 "93/106" inconsistency: that report mixed
+# file subtotals and omitted the evaluator/planner/executor/validator/
+# refundService/timeline/sprint2/sprint3.1 files. Full-suite evidence is 111.
 ```
 
 ## 2. Syntax and Package Checks
@@ -40,25 +47,25 @@ Get-ChildItem node_modules -ErrorAction SilentlyContinue | Measure-Object
 # expect 0 or minimal (no prod deps)
 ```
 
-## 4. Git Status and History
+## 4. Git Status and History (Repository Already Initialized)
 
 ```powershell
-# Before init, expect: not a git repository
-git status
-
-# After init + commit (see docs/PUBLICATION.md):
 git status --short
 git status --ignored
-git log --oneline -20
+git log --oneline -5        # expect base 2879d70 plus H1/H2/H3 review work
 git log --stat -1
+git remote -v               # expect origin https://github.com/asmkamran1/proofcase-meta-hackathon.git
 git check-ignore -v .env.local
 ```
 
 ## 5. Secret Scan
 
 ```powershell
-# No key should appear in tracked sources
-Select-String -Path src\*,public\*,fixtures\*,docs\*.json,docs\*.md -Pattern "b10_|sk-|AKIA|ghp_" | Format-Table Path,LineNumber,Line
+# No full key should appear in tracked sources.
+# Known benign matches ONLY: scan patterns/disclosure notes mentioning the
+# "b10_" prefix in SECURITY_AUDIT.md / VERIFICATION.md / PUBLICATION.md.
+Select-String -Path src\*,public\*,fixtures\*,docs\*.json,docs\*.md -Pattern "b10_" | Format-Table Path,LineNumber,Line
+# Confirm each match is a pattern/disclosure note, never a full key value.
 
 # Heuristic: search for key assignment with value
 Select-String -Path .env.example,src\*,public\*,docs\* -Pattern "BASETEN_API_KEY" | Format-Table Path,Line
@@ -71,9 +78,10 @@ Select-String -Path .env.local -Pattern "BASETEN_API_KEY" -ErrorAction SilentlyC
 ## 6. Local Application Startup
 
 ```powershell
-# Requires .env.local with BASETEN_API_KEY for live; recorded needs no key
-Copy-Item .env.example .env.local -ErrorAction SilentlyContinue
-# set BASETEN_API_KEY in .env.local if testing live
+# Requires .env.local with BASETEN_API_KEY for live; recorded needs no key.
+# Create .env.local ONLY if absent; never overwrite it:
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
+# set BASETEN_API_KEY in .env.local if testing live (never print it)
 
 node --env-file=.env.local src/server.js
 # open another terminal:

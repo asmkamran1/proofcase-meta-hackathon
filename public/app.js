@@ -64,29 +64,47 @@ function clearPlanSequence(){
 function showError(msg){ errorBox.textContent=msg; errorBox.classList.remove("hidden"); }
 function clearError(){ errorBox.classList.add("hidden"); errorBox.textContent=""; }
 async function doInterpret(useRecorded=false){
+  const mySeq = ++interpretSeq;
+  const snapshotReq = reqEl.value;
   clearError(); interpretationBox.classList.add("hidden"); planBox.classList.add("hidden");
   clearPlanSequence();
   approveBtn.disabled=true; state.plan=null; state.approvalToken=null;
   interpretStatus.textContent=useRecorded?"Loading recorded...":"Interpreting...";
-  state.businessRequirement=reqEl.value;
   try{
-    const r=await fetch("/api/interpret",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({businessRequirement:reqEl.value,useRecorded})});
+    const r=await fetch("/api/interpret",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({businessRequirement:snapshotReq,useRecorded})});
     const j=await r.json();
-    if(j.status==="MODEL_ERROR"){ showError("Model error: "+j.message); liveBadge.textContent="MODEL_ERROR"; liveBadge.className="badge"; return; }
-    if(j.status==="UNSUPPORTED_REQUIREMENT"){ showError("Unsupported requirement: "+j.message); liveBadge.textContent="UNSUPPORTED"; return; }
-    if(j.status==="INVALID_PLAN"){ showError("Invalid plan: "+j.message); if(j.plan){ planPre.textContent=JSON.stringify(j.plan,null,2); planBox.classList.remove("hidden"); renderPlanSequence(j.plan); } return; }
+    if (mySeq !== interpretSeq) return;
+    if (reqEl.value !== snapshotReq) return;
+    if (!r.ok) {
+      showError(j.error || j.code || "Interpretation rejected");
+      interpretStatus.textContent="";
+      return;
+    }
+    if(j.status==="MODEL_ERROR"){ showError("Model error: "+j.message); liveBadge.textContent="MODEL_ERROR"; liveBadge.className="badge"; interpretStatus.textContent=""; return; }
+    if(j.status==="UNSUPPORTED_REQUIREMENT"){ showError("Unsupported requirement: "+j.message); liveBadge.textContent="UNSUPPORTED"; interpretStatus.textContent=""; return; }
+    if(j.status==="INVALID_PLAN"){ showError("Invalid plan: "+j.message); if(j.plan){ planPre.textContent=JSON.stringify(j.plan,null,2); planBox.classList.remove("hidden"); renderPlanSequence(j.plan); } interpretStatus.textContent=""; return; }
+    if(j.status && j.status !== "VALID"){
+      showError(j.message || j.error || "Requirement not eligible: "+j.status);
+      interpretStatus.textContent="";
+      return;
+    }
     if(j.status==="VALID"){
       interpretationBox.textContent="Interpreted: "+j.interpretedRule; interpretationBox.classList.remove("hidden");
       planPre.textContent=JSON.stringify(j.plan,null,2); planBox.classList.remove("hidden");
       renderPlanSequence(j.plan);
+      state.businessRequirement=snapshotReq;
       state.plan=j.plan; state.approvalToken=j.approvalToken; state.modelLabel=j.modelLabel; state.modelId=j.modelId;
       modelBadge.textContent="model: "+j.modelId; liveBadge.textContent=j.live?"LIVE META RESPONSE":"RECORDED META RESPONSE";
       liveBadge.style.background=j.live?"#12331a":"#33270f";
-      approvalHint.textContent="Approval token bound to requirement+plan hash. Click Approve & Run.";
+      approvalHint.textContent="Server-issued authorization granted. Click Approve & Run.";
       approveBtn.disabled=false;
     }
     interpretStatus.textContent="";
-  }catch(e){ showError(e.message); interpretStatus.textContent=""; }
+  }catch(e){
+    if (mySeq !== interpretSeq) return;
+    if (reqEl.value !== snapshotReq) return;
+    showError(e.message); interpretStatus.textContent="";
+  }
 }
 interpretBtn.onclick=()=>doInterpret(false);
 replayBtn.onclick=()=>doInterpret(true);

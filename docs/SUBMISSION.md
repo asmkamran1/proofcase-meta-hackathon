@@ -29,9 +29,13 @@ executable test sequence exposing a seeded defect.
 
 Input: one sentence + bounded catalog (4 ops, 8 steps, cents bounds) sent
 to Muse Spark Open via Baseten. Output: STRICT JSON with interpretedRule
-and 7-step ops. The app validates structurally, checks 4-pillar semantic
-gate (cumulative, accepted, per-order, captured) and plan shape, requires
-explicit human approval (hash-bound token), then executes side-by-side:
+and 7-step ops. The app validates structurally, checks the bounded
+4-pillar semantic gate (cumulative, accepted, per-order, captured;
+reversed/strict/equality/vague-cap rejected) and plan shape, requires
+explicit human click (Approve & Run) plus server-issued HMAC execution
+authorization (per-instance key, 15-minute TTL; binds requirement +
+normalized plan + provenance + modelId -- not human identity login),
+then executes side-by-side:
 buggy variant accepts $40 + $70 vs $100 captured ($110 violation);
 corrected rejects excess. Charts, banner, JSON report.
 
@@ -45,11 +49,10 @@ prototype (disclosed).
 
 ## Public GitHub Repository
 
-PLACEHOLDER -- do not invent URL.
+https://github.com/asmkamran1/proofcase-meta-hackathon
 
-Publish via docs/PUBLICATION.md:
-https://github.com/YOUR_USERNAME/proofcase-meta-hackathon
 Standalone, MIT, zero prod dependencies, live + recorded documented.
+H1/H2/H3 review changes are local until pushed via docs/PUBLICATION.md.
 
 ## Three-Minute Demo Video
 
@@ -96,7 +99,9 @@ Muse Spark-class models in docs.
 
 ## Checklist Before Submitting
 
-- [ ] Replace PLACEHOLDERS with real URLs.
+- [ ] Video link pasted above (unlisted YouTube); repo link verified live.
+- [ ] H1/H2/H3 local changes reviewed, committed, and pushed (no force-push).
+- [ ] Label recordedResponse.json matches video caption.
 - [ ] Label recordedResponse.json matches video caption.
 - [ ] Re-run docs/VERIFICATION.md checklist.
 - [ ] Do not commit .env.local; .gitignore covers it.

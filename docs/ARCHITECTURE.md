@@ -17,17 +17,28 @@ Defect is intentionally seeded and fictional.
   discloses bug. Extracts JSON, unwraps wrapped ops, attaches _diag.
 - testPlanValidator.js -- bounded contract: version, ruleId, 2..8 ops,
   allowlist + bounds + refs, alias normalization. Fails closed.
-- semanticGate.js -- (Sprint 3.1) 4-pillar eligibility: cumulative,
+- semanticGate.js -- 4-pillar eligibility: cumulative,
   accepted, per-order, captured. Checks requirement, interpretedRule,
-  and plan exceed-cap shape. VALID vs NEEDS_INPUT/UNSUPPORTED.
-- approval.js -- SHA-256 canonical hash over requirement+plan.
+  and plan exceed-cap shape. Hardened fail-closed: reversed exceed,
+  strict less-than, equality, and vague cap language rejected.
+  Returns VALID vs NEEDS_INPUT/UNSUPPORTED.
+- approval.js -- server-issued HMAC execution authorization
+  (per-instance random 32-byte key, 15-minute TTL, constant-time
+  signature and digest comparison). Binds canonical requirement hash
+  plus normalized plan hash plus provenance plus modelId. Legacy
+  unsigned SHA-256 hashes cannot authorize /api/run. Authorization
+  is not human identity authentication.
 - refundService.js -- in-memory fictional service. Buggy: per-refund
   check only. Corrected: cumulative check. No DB.
 - executor.js -- fixed deterministic switch on allowlisted ops;
   requires approved===true; never evals model JS.
-- server.js -- Node http server: /api/config, /api/recorded,
-  /api/interpret (validate+gate+token), /api/run (re-gate+verify+
-  dual execute). Static public/. Sanitizes paths.
+- server.js -- Node http server bound strictly to 127.0.0.1
+  (no public bind, no HOST override): /api/config, /api/recorded,
+  /api/interpret (validate + gate + HMAC authorization),
+  /api/run (re-gate + verify + dual execute). Static public/
+  with traversal/symlink fail-closed handling. Host/Origin
+  checks before paid inference; in-memory live-inference rate
+  limit (not a durable spending cap); no wildcard CORS.
 - public/ -- Minimal proof UI: textarea, Interpret + Use Recorded,
   interpreted rule, numbered timeline, raw plan, Approve & Run,
   buggy vs corrected charts+traces, invariant banner, JSON export.
@@ -37,21 +48,26 @@ Defect is intentionally seeded and fictional.
 
 ## 3. Flow
 
-1. Requirement + catalog -> Muse Spark (or recordedResponse.json)
-2. normalize + validate (structural)
-3. semantic gate (pillars + interpretedRule + plan shape)
-4. approval hash (token bound to requirement+plan)
-5. human click Approve & Run
-6. /api/run re-validates, re-gates, verifies hash
-7. executePlan buggy + correct (deterministic)
-8. invariant banner + charts + JSON report
+1. Requirement + catalog -> Muse Spark Open via Baseten (or recordedResponse.json)
+2. normalize + validate (structural: version, ruleId, 2..8 ops, allowlist + bounds + refs)
+3. semantic gate (bounded keyword eligibility: cumulative + accepted + per-order + captured; reversed/strict/equality/vague-cap fail-closed; plus interpretedRule + plan exceed-cap shape)
+4. server-issued HMAC execution authorization (per-instance key, 15-min TTL; binds canonical requirement + normalized plan + provenance + modelId)
+5. explicit human click Approve & Run (UI never auto-runs; edits invalidate approval; stale/overlapping responses discarded)
+6. /api/run re-validates, re-gates, verifies HMAC (fail-closed 400; legacy unsigned hashes rejected)
+7. executePlan buggy + correct (deterministic, allowlisted ops only)
+8. invariant banner + charts + JSON report (server-trusted provenance/modelId; client labels ignored)
 
 ## 4. Safety
 
-No DB, no auth, no payment APIs, no browser automation, no Playwright.
-No arbitrary code: fixed switch only. Approval invalidated on change.
-Gate enforced twice. Requirement capped 2000, ops capped 8. Secrets
-never printed. .env.local never committed.
+No DB, no human identity authentication, no payment APIs, no browser
+automation, no Playwright. Provenance and rate limiting are server-side
+controls, not cross-machine security boundaries: loopback-only binding
+plus Host/Origin checks do not authenticate arbitrary local processes,
+and the in-memory rate limit is not a durable spending cap.
+No arbitrary code: fixed switch only. Server-issued authorization is
+invalidated on requirement/plan change and expires after 15 minutes.
+Gate enforced twice (interpret + run). JSON bodies capped at 64 KiB.
+Secrets never printed. .env.local never committed.
 
 ## 5. Prompt Discipline
 

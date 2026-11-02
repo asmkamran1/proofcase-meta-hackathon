@@ -1,5 +1,6 @@
 // Bounded semantic eligibility gate for refund-cap invariant.
 // Requires cumulative, accepted, per-order, captured.
+// Hardened: reversed, strict, equality, vague fail-closed.
 const CUMULATIVE_RE = /\b(total|sum|cumulativ\w*|aggregat\w*|combined|collectively|together|overall|entire|capped)\b/i;
 const ACCEPTED_RE = /\b(accepted|approved)\b/i;
 const PER_ORDER_RE = /\border\b/i;
@@ -8,6 +9,36 @@ function hasCumulative(t){return CUMULATIVE_RE.test(t);}
 function hasAccepted(t){return ACCEPTED_RE.test(t);}
 function hasPerOrder(t){return PER_ORDER_RE.test(t);}
 function hasCaptured(t){return CAPTURED_RE.test(t);}
+function hasNegatedExceed(req){
+  // Support exceed, surpass, greater, more than with negation
+  const neg = "\\b(cannot|cant|can\\s+not|must\\s+not|must\\s+never|never|not|should\\s+not|shall\\s+not|will\\s+not|cannot)\\b";
+  const re1 = new RegExp(neg + "[^.]{0,40}\\b(exceed|surpass|greater|more\\s+than)\\b", "i");
+  const re2 = /\b(exceed|surpass|greater|more\s+than)\b[^.]{0,20}\b(not|cannot|never)\b/i;
+  return re1.test(req) || re2.test(req);
+}
+function isReversedExceed(req){
+  if(!/\b(exceed|surpass|greater|more\s+than)\b/i.test(req)) return false;
+  return !hasNegatedExceed(req);
+}
+function isStrictLess(req){
+  return /\bstrictly\s+(less|smaller|below)\b/i.test(req) || /\bless\s+than\b/i.test(req) || /\bsmaller\s+than\b/i.test(req) || /\bstrictly\s+less\b/i.test(req);
+}
+function isEquality(req){
+  return /\bequal(s|ity)?\b/i.test(req);
+}
+function hasCapRelation(req){
+  if (hasNegatedExceed(req)) return true;
+  if (/\bcapped\s+(by|at)\b/i.test(req)) return true;
+  if (/\bstay\s+within\b/i.test(req)) return true;
+  if (/\bwithin\b/i.test(req) && /\bcaptur/i.test(req)) return true;
+  if (/\blimit\b/i.test(req)) return true;
+  if (/\bcapped\b/i.test(req)) return true;
+  if (/\bsurpass\b/i.test(req) && hasNegatedExceed(req)) return true;
+  if (/\bmore\s+than\b/i.test(req) && hasNegatedExceed(req)) return true;
+  if (/cannot be more than/i.test(req)) return true;
+  if (/\b(cannot|must\s+not|never|not)\b[^.]{0,20}\b(greater|surpass)\b/i.test(req)) return true;
+  return false;
+}
 function missingPillars(req){
   const r=String(req??"").trim();
   const m=[];
@@ -60,8 +91,25 @@ export function checkSemanticEligibility({businessRequirement,interpretedRule,pl
     let status=mentionsRefund?"NEEDS_INPUT":"UNSUPPORTED";
     const outHints=["email","notification","within 24","24 hour","sla","time"];
     if(outHints.some(h=>req.toLowerCase().includes(h))) status="UNSUPPORTED";
+    // Strict/equality checks even when pillars missing: they are clearly invalid semantic intent
+    if(isStrictLess(req) || isEquality(req)){
+      return {eligible:false,status:"NEEDS_INPUT",reason:"Requirement uses strict or equality comparison, not cumulative cap <= captured.",missing,needsHumanReview:true,unverified:true,evidence:{cumulative:hasCumulative(req),accepted:hasAccepted(req),perOrder:hasPerOrder(req),captured:hasCaptured(req)}};
+    }
     const reason=`Requirement missing essential invariant pillars: ${missing.join(", ")}. Vague terms like large/reasonable/correctly do not satisfy gate.`;
     return {eligible:false,status,reason,missing,needsHumanReview:true,unverified:true,evidence:{cumulative:hasCumulative(req),accepted:hasAccepted(req),perOrder:hasPerOrder(req),captured:hasCaptured(req)}};
+  }
+  // Hardened semantic checks where pillars are present
+  if(isReversedExceed(req)){
+    return {eligible:false,status:"NEEDS_INPUT",reason:"Requirement states refunds must exceed captured payment (inverted invariant).",missing:[],needsHumanReview:true,unverified:true,evidence:{cumulative:hasCumulative(req),accepted:hasAccepted(req),perOrder:hasPerOrder(req),captured:hasCaptured(req)}};
+  }
+  if(isStrictLess(req)){
+    return {eligible:false,status:"NEEDS_INPUT",reason:"Requirement uses strict less-than, not allowed: refunds must not exceed captured (<=).",missing:[],needsHumanReview:true,unverified:true,evidence:{cumulative:hasCumulative(req),accepted:hasAccepted(req),perOrder:hasPerOrder(req),captured:hasCaptured(req)}};
+  }
+  if(isEquality(req)){
+    return {eligible:false,status:"NEEDS_INPUT",reason:"Requirement requires equality to captured, not cumulative cap.",missing:[],needsHumanReview:true,unverified:true,evidence:{cumulative:hasCumulative(req),accepted:hasAccepted(req),perOrder:hasPerOrder(req),captured:hasCaptured(req)}};
+  }
+  if(!hasCapRelation(req)){
+    return {eligible:false,status:"NEEDS_INPUT",reason:"Requirement contains invariant keywords but no meaningful cap relationship (exceed/capped/within/limit).",missing:[],needsHumanReview:true,unverified:true,evidence:{cumulative:hasCumulative(req),accepted:hasAccepted(req),perOrder:hasPerOrder(req),captured:hasCaptured(req)}};
   }
   if(interpretedRule!==undefined){
     const irCheck=interpretedRuleConsistent(interpretedRule);

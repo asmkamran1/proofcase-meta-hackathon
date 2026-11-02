@@ -49,7 +49,13 @@ in Sprint 4 -- documentation, audit, and submission readiness only.
 - Ten synthetic evaluation cases are not a general benchmark.
 - Evaluation labels established before any model call and never modified
   after seeing results; prior live reports archived, not overwritten.
-- Ambiguous requirements are refused via semantic gate, not hallucinated.
+- Ambiguous requirements are refused via bounded semantic gate, not
+  hallucinated. The gate checks keyword eligibility only; it does not
+  prove formal semantic equivalence. Double-negation and exotic
+  paraphrases outside the documented vocabulary are unverified.
+- Server-issued execution authorization is not human identity
+  authentication. Loopback + Host/Origin checks do not authenticate
+  arbitrary local processes.
 
 ## Licensing
 

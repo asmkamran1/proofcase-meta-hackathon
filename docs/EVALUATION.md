@@ -27,9 +27,9 @@ Validator enforces version 1.0, ruleId refund-cap, no extra fields, refs must ex
 
 Model prompt (src/planner.js buildRefundPrompt) includes only requirement + catalogDescription(). Never includes expected labels, correct sequences, or seeded defect details.
 
-## 3. Dataset
+## 3. Dataset (Frozen Labels; Human Review Separate)
 
-Source: fixtures/evaluation.json (10 cases, pre-established before any model call)
+Source: fixtures/evaluation.json (10 cases, labels frozen pre-model).
 
 - 6 Supported paraphrases (SUP-01..SUP-06) should yield valid plan demonstrating two refunds collectively exceeding captured payment (e.g., 10000 captured, 4000 accepted, 7000 rejected).
 - 2 Ambiguous with missing essential conditions (AMB-01, AMB-02) should return unsupported marker, not a fabricated valid plan.

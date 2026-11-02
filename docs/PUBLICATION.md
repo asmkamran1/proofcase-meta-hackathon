@@ -2,6 +2,13 @@
 
 > Do not commit, push, or publish automatically. All steps require your
 > action. Stop if any verification fails.
+>
+> IMPORTANT: this repository is ALREADY initialized and published:
+> remote `origin` is https://github.com/asmkamran1/proofcase-meta-hackathon
+> at base commit `2879d70`. Do NOT run `git init`, `git remote add`,
+> or any command that deletes/recreates the repository. The steps below
+> review, stage, commit, and push incremental H1/H2/H3 changes only.
+> No force-push.
 
 ## Preconditions
 
@@ -10,18 +17,13 @@
 - You have created a public YouTube unlisted video per DEMO_SCRIPT.md.
 - You have replaced SUBMISSION.md PLACEHOLDERS mentally (links added after).
 
-## 1. Initialize Git in the Standalone Repo
+## 1. Review Existing Repository State (Do NOT Re-initialize)
 
 ```powershell
 cd C:\Repo\proofcase-meta-hackathon
-git init
-git config user.name "Your Name"
-git config user.email "you@example.com"
-```
-
-Verify .gitignore covers secrets:
-
-```powershell
+git status --short
+git log --oneline -5        # expect base 2879d70 plus prior work
+git remote -v               # expect origin https://github.com/asmkamran1/proofcase-meta-hackathon.git
 git check-ignore -v .env.local
 # should print: .gitignore:2:.env.local  .env.local
 ```
@@ -30,7 +32,7 @@ git check-ignore -v .env.local
 
 ```powershell
 Select-String -Path src\*,public\*,fixtures\*,docs\*.json,docs\*.md -Pattern "b10_|sk-|AKIA|ghp_|BASETEN_API_KEY\s*=\s*['\"\"]?\w+" | Format-Table Path,Line
-# expect no output (no key in tracked files)
+# Known benign matches ONLY (scan patterns and disclosure notes, not key values):
 
 git status --ignored
 # .env.local should appear under Ignored, not Staged
@@ -38,25 +40,30 @@ git status --ignored
 
 If .env.local appears as not ignored, stop and re-apply .gitignore.
 
-## 3. Add and Commit Tracked Files
+## 3. Stage, Commit, and Push Incremental Changes
 
 ```powershell
-git add .gitignore package.json README.md LICENSE THIRD_PARTY_NOTICES.md NEW_WORK.md fixtures docs public scripts src test
+git status --short   # review: expect H1/H2/H3 hardening files only
+git diff --stat
+# Confirm .env.local is NOT staged; confirm no key material in diff:
+git diff -- docs src public test fixtures scripts
+git add docs README.md NEW_WORK.md THIRD_PARTY_NOTICES.md public src test fixtures scripts package.json .gitignore
 git status   # review -- .env.local and node_modules must NOT be staged
-git log --oneline  # should be empty (first commit)
-git commit -m "ProofCase: Meta Muse Spark refund invariant demo (Oct 26-Nov 4) -- submission"
-git log --oneline --stat
+git commit -m "H3: hardening regression audit and release-doc corrections"
+git log --oneline -5
 git show --stat HEAD
 ```
 
-## 4. Create and Push Public GitHub Repo
+## 4. Push to the Existing Public GitHub Repo
 
-On github.com: New repository -> name `proofcase-meta-hackathon` -> Public -> no README/license/gitignore (we already have them) -> Create.
+The repository already exists at
+https://github.com/asmkamran1/proofcase-meta-hackathon
+with `origin` already configured. Do NOT create a new repository and
+do NOT run `git remote add` (it will fail because `origin` exists).
 
 ```powershell
-git remote add origin https://github.com/YOUR_USERNAME/proofcase-meta-hackathon.git
-git branch -M main
-git push -u origin main
+git pull --rebase origin main
+git push origin main
 ```
 
 Verify on GitHub web: README renders, no .env.local visible, Actions secret scanning clean.
@@ -75,7 +82,8 @@ Copy entries from docs/SUBMISSION.md, replacing:
 - Team Name, Indie Developer Track
 - Problem Statement: Build for Your World
 - Project Description
-- Public GitHub Repository: https://github.com/YOUR_USERNAME/proofcase-meta-hackathon
+- Public GitHub Repository: https://github.com/asmkamran1/proofcase-meta-hackathon
+  (live; H1/H2/H3 review-commit still to push via Section 3-4 above)
 - Demo Video: https://www.youtube.com/watch?v=YOUR_VIDEO_ID (unlisted)
 - Meta Products Used, Why Meta Models Matter, feedback fields
 

@@ -38,16 +38,18 @@ Requires Node 20+.
 
 ```powershell
 cd C:\Repo\proofcase-meta-hackathon
-npm install
-Copy-Item .env.example .env.local
-# set BASETEN_API_KEY in .env.local (never commit it)
+npm install   # zero prod dependencies; verifies package manifest only
+# Create .env.local ONLY if absent; never overwrite an existing file:
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
+# set BASETEN_API_KEY in .env.local (never commit it; never print it)
 
 # tests (no API key needed)
 node --test test/
 
-# app
+# app (recorded replay needs no key; live inference needs BASETEN_API_KEY)
 node --env-file=.env.local src/server.js
 # open http://localhost:8080
+
 
 # feasibility gate (real inference)
 node scripts/runFeasibility.js
@@ -86,9 +88,21 @@ Max 8 ops, IDs ^[A-Za-z0-9_-]{1,32}$.
 
 ## 8. Human Approval and Safety
 
-- Approval: SHA-256 hash over requirement+plan; stale tokens rejected.
-- Semantic gate: checks pillars + interpretedRule + plan shape before
-  token and again on execution. Unverified => no token, 400 on run.
+- Authorization: server-issued HMAC token (per-instance random 32-byte key,
+  15-minute TTL, constant-time signature check). Binds canonical
+  requirement hash + normalized plan hash + provenance + modelId.
+  Legacy unsigned SHA-256 hashes cannot authorize `/api/run`.
+  This is server-issued execution authorization, not human identity
+  authentication.
+- Explicit human step: UI requires Approve & Run click; `doInterpret`
+  never calls `/api/run`. Requirement edits invalidate approval;
+  stale/overlapping interpretation responses are discarded via
+  generation counter (`interpretSeq`) and requirement snapshot.
+- Semantic gate: bounded keyword eligibility (cumulative, accepted,
+  per-order, captured) plus reversed/strict/equality/vague-cap
+  fail-closed checks, plus `interpretedRule` and plan exceed-cap shape.
+  Enforced in `/api/interpret` (no token when ineligible) and re-checked
+  in `/api/run` (400 when ineligible). Unverified means no execution.
 - Fail-closed, no arbitrary code, no Playwright, no DB.
 
 ## 9. Evaluation Results and Limitations

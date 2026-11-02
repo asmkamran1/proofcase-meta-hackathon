@@ -20,8 +20,8 @@ buggy vs corrected, evidence export, and safety behavior.
 
 ## Browser Prep
 
-1. Copy-Item .env.example .env.local and set BASETEN_API_KEY if doing live.
-2. node --env-file=.env.local src/server.js -- open http://localhost:8080.
+1. Copy only if absent; never overwrite: if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local } and set BASETEN_API_KEY if doing live.
+2. node --env-file=.env.local src/server.js -- open http://localhost:8080 (loopback only).
 3. Refresh, confirm default requirement visible.
 4. Have recordedResponse.json tab ready as backup.
 5. Do Not Disturb on, mic tested.
@@ -87,8 +87,12 @@ Steps:
 
 Show: approvalHint + Approve & Run.
 
-Narrate: "Nothing executes until human approves. Token is hash-bound to
-requirement and plan. Changing a word invalidates it."
+Narrate: "Nothing executes until a human clicks Approve & Run. The
+server issues an HMAC execution authorization bound to the exact
+requirement, normalized plan, and recorded/live provenance after the
+semantic gate passes. Changing a word invalidates it; authorization
+expires after 15 minutes. This authorizes one local run -- it does
+not authenticate a human identity."
 
 Action: hover approvalHint, click Approve & Run, show Running.
 

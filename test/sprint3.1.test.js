@@ -9,6 +9,14 @@ import { approvalHash, verifyApproval } from '../src/approval.js';
 import { executePlan } from '../src/executor.js';
 import { generateTestPlan } from '../src/planner.js';
 import { MAX_ATTEMPTS } from '../src/metaClient.js';
+// Snapshot every provider-related key so local .env.local contents,
+// stale PowerShell exports, and parallel test files cannot leak into
+// assertions or change budgets/retries/endpoints mid-run.
+const ENV_KEYS = ["MODEL_PROVIDER","MODEL_API_KEY","META_MODEL","META_BASE_URL","META_MAX_TOKENS","META_RETRY_MAX_TOKENS","MODEL_MAX_TOKENS","MODEL_RETRY_MAX_TOKENS","BASETEN_API_KEY","BASETEN_BASE_URL","BASETEN_MODEL","BASETEN_MAX_TOKENS","BASETEN_RETRY_MAX_TOKENS"];
+const snapEnv = () => { const s = {}; for (const k of ENV_KEYS) s[k] = process.env[k]; return s; };
+const restoreEnv = (s) => { for (const k of ENV_KEYS) { if (s[k] === undefined) delete process.env[k]; else process.env[k] = s[k]; } };
+const clearEnv = () => { for (const k of ENV_KEYS) delete process.env[k]; };
+function withMetaTestKey() { process.env.MODEL_PROVIDER = 'META'; process.env.MODEL_API_KEY = 'test-key'; }
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const FIXTURES_PATH = path.join(ROOT, 'fixtures', 'evaluation.json');
@@ -50,13 +58,13 @@ test('approval invalidation on changed requirements',()=>{
   const br1='Total accepted refunds for an order cannot exceed captured payment.'; const br2='Refunds should not be too large.'; const plan=validPlanForReq(br1); const tok=approvalHash({businessRequirement:br1,plan}); assert.ok(verifyApproval({businessRequirement:br1,plan,approvalToken:tok})); assert.equal(verifyApproval({businessRequirement:br2,plan,approvalToken:tok}),false);
 });
 test('output truncation triggers bounded retry with higher budget', async()=>{
-  const prev=process.env.BASETEN_API_KEY; process.env.BASETEN_API_KEY='test-key';
-  try{ let callCount=0; const fetchImpl=async(url,opts)=>{ callCount++; const body=JSON.parse(opts.body); if(callCount===1) return {ok:true,status:200, json:async()=>({model:'meta-models/muse-spark-open-1026', choices:[{finish_reason:'length', message:{content:''}}], usage:{completion_tokens:4095}})}; const plan=validPlanForReq('Total accepted refunds for an order cannot exceed captured payment.'); return {ok:true,status:200, json:async()=>({model:'meta-models/muse-spark-open-1026', choices:[{finish_reason:'stop', message:{content:JSON.stringify(plan)}}], usage:{completion_tokens:300}})}; }; const out=await generateTestPlan({businessRequirement:'Total accepted refunds for an order cannot exceed captured payment.', fetchImpl, maxTokens:4096}); assert.equal(out._diag.attempts,2); assert.equal(out._diag.retried,true); assert.ok(out._diag.outputBudget>4096); assert.equal(callCount,2); } finally { if(prev===undefined) delete process.env.BASETEN_API_KEY; else process.env.BASETEN_API_KEY=prev; }
+  const s=snapEnv(); clearEnv(); withMetaTestKey();
+  try{ let callCount=0; const fetchImpl=async(url,opts)=>{ callCount++; const body=JSON.parse(opts.body); if(callCount===1) return {ok:true,status:200, json:async()=>({model:'muse-spark-1.3', choices:[{finish_reason:'length', message:{content:''}}], usage:{completion_tokens:4095}})}; const plan=validPlanForReq('Total accepted refunds for an order cannot exceed captured payment.'); return {ok:true,status:200, json:async()=>({model:'muse-spark-1.3', choices:[{finish_reason:'stop', message:{content:JSON.stringify(plan)}}], usage:{completion_tokens:300}})}; }; const out=await generateTestPlan({businessRequirement:'Total accepted refunds for an order cannot exceed captured payment.', fetchImpl, maxTokens:4096}); assert.equal(out._diag.attempts,2); assert.equal(out._diag.retried,true); assert.ok(out._diag.outputBudget>4096); assert.equal(callCount,2); } finally { restoreEnv(s); }
 });
 test('maximum two attempts per case invariant',()=>{ assert.equal(MAX_ATTEMPTS,2); const len=JSON.parse(fs.readFileSync(FIXTURES_PATH,'utf8')).cases.length; assert.equal(len*MAX_ATTEMPTS,20); });
 test('actual provider request counting via _diag.attempts', async()=>{
-  const prev=process.env.BASETEN_API_KEY; process.env.BASETEN_API_KEY='test-key';
-  try{ let calls=0; const fetchImpl=async(url,opts)=>{ calls++; const body=JSON.parse(opts.body); if(calls===1) return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'length', message:{content:''}}], usage:{completion_tokens: body.max_tokens-1}})}; const plan=validPlanForReq('Total accepted refunds for an order cannot exceed captured payment.'); return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'stop', message:{content:JSON.stringify(plan)}}], usage:{completion_tokens:100}})}; }; const out=await generateTestPlan({businessRequirement:'Total accepted refunds for an order cannot exceed captured payment.', fetchImpl, maxTokens:4096}); assert.equal(calls,2); assert.equal(out._diag.attempts,2); } finally { if(prev===undefined) delete process.env.BASETEN_API_KEY; else process.env.BASETEN_API_KEY=prev; }
+  const s2=snapEnv(); clearEnv(); withMetaTestKey();
+  try{ let calls=0; const fetchImpl=async(url,opts)=>{ calls++; const body=JSON.parse(opts.body); if(calls===1) return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'length', message:{content:''}}], usage:{completion_tokens: body.max_completion_tokens-1}})}; const plan=validPlanForReq('Total accepted refunds for an order cannot exceed captured payment.'); return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'stop', message:{content:JSON.stringify(plan)}}], usage:{completion_tokens:100}})}; }; const out=await generateTestPlan({businessRequirement:'Total accepted refunds for an order cannot exceed captured payment.', fetchImpl, maxTokens:4096}); assert.equal(calls,2); assert.equal(out._diag.attempts,2); } finally { restoreEnv(s2); }
 });
 test('exact classification versus safe abstention metrics separated',()=>{
   const mockResults=[...Array.from({length:6},(_,i)=>({caseId:'SUP-0'+(i+1), expectedClassification:'supported', actualModelClassification:'supported'})), ...Array.from({length:2},(_,i)=>({caseId:'AMB-0'+(i+1), expectedClassification:'ambiguous', actualModelClassification:'unsupported'})), ...Array.from({length:2},(_,i)=>({caseId:'UNS-0'+(i+1), expectedClassification:'unsupported', actualModelClassification:'unsupported'}))];
@@ -68,20 +76,20 @@ test('no automatic paid API calls in tests',()=>{
   const evalCode=fs.readFileSync(path.join(ROOT,'scripts','evaluate.mjs'),'utf8'); assert.ok(evalCode.includes("args.includes('"+liveFlag+"')")); const thisFile=fs.readFileSync(path.join(ROOT,'test','sprint3.1.test.js'),'utf8'); assert.ok(!thisFile.includes('node scripts/evaluate.mjs '+liveFlag));
 });
 test('no retry on invalid semantics or validation failure', async()=>{
-  const prev=process.env.BASETEN_API_KEY; process.env.BASETEN_API_KEY='test-key';
+  const s3=snapEnv(); clearEnv(); withMetaTestKey();
   try{
     let callCount=0; const fetchImpl=async()=>{ callCount++; const plan=validPlanForReq('Refunds should not be too large.'); return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'stop', message:{content: JSON.stringify(plan)}}], usage:{completion_tokens:100}})}; };
     const out=await generateTestPlan({businessRequirement:'Refunds should not be too large.', fetchImpl}); assert.equal(callCount,1);
     let call2=0; const fetchImpl2=async()=>{ call2++; return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'stop', message:{content:'not json {'}}], usage:{}})}; };
     const out2=await generateTestPlan({businessRequirement:'test', fetchImpl:fetchImpl2}); assert.equal(out2.__modelError,true); assert.equal(call2,1);
-  } finally { if(prev===undefined) delete process.env.BASETEN_API_KEY; else process.env.BASETEN_API_KEY=prev; }
+  } finally { restoreEnv(s3); }
 });
 test('higher retry budget only on recognized truncation', async()=>{
-  const prev=process.env.BASETEN_API_KEY; process.env.BASETEN_API_KEY='test-key';
+  const s4=snapEnv(); clearEnv(); withMetaTestKey();
   try{
     let callCount=0; const fetchImpl=async()=>{ callCount++; return {ok:true,status:200, json:async()=>({model:'m', choices:[{finish_reason:'stop', message:{content:''}}], usage:{completion_tokens:10}})}; };
     const out=await generateTestPlan({businessRequirement:'x', fetchImpl, maxTokens:4096}); assert.equal(out.__modelError,true); assert.equal(callCount,1);
-  } finally { if(prev===undefined) delete process.env.BASETEN_API_KEY; else process.env.BASETEN_API_KEY=prev; }
+  } finally { restoreEnv(s4); }
 });
 test('evaluator report contains separated metrics and archive logic',()=>{
   const evalCode=fs.readFileSync(path.join(ROOT,'scripts','evaluate.mjs'),'utf8');

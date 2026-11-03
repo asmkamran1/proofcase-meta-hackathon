@@ -5,8 +5,11 @@
 Meta Global AI Developer Hackathon 2026 -- Indie Developer Track.
 Problem statement: Build for Your World.
 Team: solo indie developer.
-Project: ProofCase -- Refund Invariant Demo with Meta Muse Spark Open.
-Model: meta-models/muse-spark-open-1026 via Baseten.
+Project: ProofCase -- Refund Invariant Demo with Meta Muse Spark.
+New live inference: Meta Model API, Muse Spark 1.3 (`muse-spark-1.3`).
+Historical evidence: Muse Spark Open via Baseten
+(`meta-models/muse-spark-open-1026`). No new paid evaluations were
+performed during M1 migration; demo may run entirely offline in recorded mode.
 Window: October 26 -- November 4, 2026.
 
 ## Provenance

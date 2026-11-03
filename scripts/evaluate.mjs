@@ -39,7 +39,7 @@ Usage:
 
 Safety:
   - Default is OFFLINE/MOCK: no network, no API key required, no paid requests.
-  - Live mode requires BASETEN_API_KEY in env/.env.local and explicit --live flag.
+  - Live mode requires the selected provider key (MODEL_API_KEY for META default, BASETEN_API_KEY for BASETEN) and explicit --live flag.
   - Max cases: 10. Max attempts per case: ` + MAX_ATTEMPTS + ` . Max total paid requests capped at ` + (MAX_CASES * MAX_ATTEMPTS) + `.
   - No API keys or secrets are printed. Model prompt never includes expected labels or defect details.
   - Evaluation labels are pre-established in fixtures/evaluation.json and never modified after model results.
@@ -128,8 +128,10 @@ async function evaluate() {
   console.log(`Disclaimer: ${fixtures.meta.disclaimer}`);
   console.log('');
   if (live) {
-    const hasKey = !!process.env.BASETEN_API_KEY;
-    console.log(`Live prerequisites: BASETEN_API_KEY present: ${hasKey ? 'yes (hidden)' : 'NO — will fail closed'}`);
+    const provider = String(process.env.MODEL_PROVIDER || "").trim().toUpperCase() || "META";
+    const keyName = provider === "BASETEN" ? "BASETEN_API_KEY" : "MODEL_API_KEY";
+    const hasKey = provider === "BASETEN" ? !!process.env.BASETEN_API_KEY : !!process.env.MODEL_API_KEY;
+    console.log(`Live prerequisites: provider=${provider} ${keyName} present: ${hasKey ? 'yes (hidden)' : 'NO -- will fail closed'}`);
   }
   let totalPaidAttempts = 0;
   const maxTotalAttempts = maxTotalPaid;

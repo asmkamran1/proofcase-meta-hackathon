@@ -2,7 +2,7 @@
 // Never reveals seeded bug or expected sequence.
 
 import { catalogDescription, BUSINESS_REQUIREMENT } from "./catalog.js";
-import { basetenConfig, resolveBudgets, MAX_ATTEMPTS } from "./metaClient.js";
+import { modelConfig, resolveBudgets, MAX_ATTEMPTS, buildChatRequestBody, UPSTREAM_TIMEOUT_MS } from "./metaClient.js";
 
 // Build prompt for refund invariant. No bug disclosure.
 function buildRefundPrompt({ businessRequirement }) {
@@ -78,14 +78,21 @@ function describeChoice(data){
   const reasoningTokens=pickNumber(data?.usage?.completion_tokens_details?.reasoning_tokens, data?.usage?.reasoning_tokens);
   return {returnedModelId,finishReason,message,content,hasContent,completionTokens,reasoningTokens};
 }
-async function postChat({url,apiKey,model,messages,budget,fetchImpl}){
-  const body={model,temperature:0,max_tokens:budget,response_format:{type:"json_object"},messages};
-  return await fetchImpl(url,{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify(body)});
+async function postChat({url,apiKey,model,messages,budget,fetchImpl,provider}){
+  const resolvedProvider = provider || modelConfig().provider;
+  const body = buildChatRequestBody({ provider: resolvedProvider, model, messages, budget });
+  const controller = new AbortController();
+  const timeoutMs = typeof UPSTREAM_TIMEOUT_MS === "number" ? UPSTREAM_TIMEOUT_MS : 60000;
+  const timer = setTimeout(() => { try { controller.abort(); } catch {} }, timeoutMs);
+  try {
+    return await fetchImpl(url,{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
+  } finally { clearTimeout(timer); }
 }
-async function retryAfterTruncation({url,apiKey,model,messages,fetchImpl,initial,retryBudget}){
+async function retryAfterTruncation({url,apiKey,model,messages,fetchImpl,provider,initial,retryBudget}){
   let res2;
-  try{ res2=await postChat({url,apiKey,model,messages,budget:retryBudget,fetchImpl}); }catch(err){
-    return {__modelError:true,message:`Model request failed: ${err.message}`,_diag:buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:retryBudget,attempts:MAX_ATTEMPTS,retried:true})};
+  try{ res2=await postChat({url,apiKey,model,messages,budget:retryBudget,fetchImpl,provider}); }catch(err){
+    const msg = err && err.name === "AbortError" ? "Model request timed out. No answer fabricated." : `Model request failed: ${err.message}`;
+    return {__modelError:true,message:msg,_diag:buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:retryBudget,attempts:MAX_ATTEMPTS,retried:true})};
   }
   const httpStatus2=typeof res2.status==="number"?res2.status:(res2.ok?200:null);
   if(!res2.ok){
@@ -105,17 +112,24 @@ async function retryAfterTruncation({url,apiKey,model,messages,fetchImpl,initial
 }
 
 export async function generateTestPlan({ businessRequirement = BUSINESS_REQUIREMENT, fetchImpl = fetch, maxTokens } = {}) {
-  const { apiKey, baseUrl, model } = basetenConfig();
-  if (!apiKey) {
-    return { __modelError: true, message: "Missing BASETEN_API_KEY. Set it in .env.local (never commit it).", _diag: buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:null,attempts:1,retried:false}) };
+  let cfg;
+  try {
+    cfg = modelConfig();
+  } catch (err) {
+    return { __modelError: true, message: `Model configuration error: ${err.message} No answer fabricated.`, _diag: buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:null,attempts:1,retried:false}) };
   }
-  const budgets = resolveBudgets({ maxTokens });
+  const { apiKey, model, chatUrl, provider } = cfg;
+  if (!apiKey) {
+    const hint = provider === "META" ? "Missing MODEL_API_KEY. Set it in .env.local (never commit it)." : "Missing BASETEN_API_KEY. Set it in .env.local (never commit it).";
+    return { __modelError: true, message: hint, _diag: buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:null,attempts:1,retried:false}) };
+  }
+  const budgets = resolveBudgets({ maxTokens, provider });
   const initial = budgets.initial;
   const retryBudget = budgets.retry;
   const messages = buildRefundPrompt({ businessRequirement });
-  const url = `${baseUrl}/chat/completions`;
+  const url = chatUrl;
   let res;
-  try { res = await postChat({url,apiKey,model,messages,budget:initial,fetchImpl}); } catch(err){ return {__modelError:true,message:`Model request failed: ${err.message}`,_diag:buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:initial,attempts:1,retried:false})}; }
+  try { res = await postChat({url,apiKey,model,messages,budget:initial,fetchImpl,provider}); } catch(err){ const msg = err && err.name === "AbortError" ? "Model request timed out. No answer fabricated." : `Model request failed: ${err.message}`; return {__modelError:true,message:msg,_diag:buildDiag({httpStatus:null,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:initial,attempts:1,retried:false})}; }
   const httpStatus=typeof res.status==="number"?res.status:(res.ok?200:null);
   if(!res.ok){ let hint=""; try{ const d=await res.json(); const m=d?.error?.message||d?.message||d?.error; if(typeof m==="string"&&m.trim()) hint=` Provider says: ${m.trim().slice(0,200)}`; }catch{} return {__modelError:true,message:`Model HTTP ${httpStatus}.${hint} No answer fabricated.`,_diag:buildDiag({httpStatus,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:initial,attempts:1,retried:false})}; }
   let data; try{ data=await res.json(); }catch{ return {__modelError:true,message:"Model returned non-JSON. No answer fabricated.",_diag:buildDiag({httpStatus,modelId:null,finishReason:null,completionTokens:null,reasoningTokens:null,hasContent:false,outputBudget:initial,attempts:1,retried:false})}; }
@@ -124,7 +138,7 @@ export async function generateTestPlan({ businessRequirement = BUSINESS_REQUIREM
   if(typeof first.message?.refusal==="string"&&first.message.refusal.trim()) return {__modelError:true,message:"Model refused the request. No answer fabricated.",_diag:diag()};
   if(!first.hasContent){
     if(isConfirmedTruncation({hasContent:false,finishReason:first.finishReason,completionTokens:first.completionTokens,budgetUsed:initial})){
-      return await retryAfterTruncation({url,apiKey,model,messages,fetchImpl,initial,retryBudget});
+      return await retryAfterTruncation({url,apiKey,model,messages,fetchImpl,provider,initial,retryBudget});
     }
     return {__modelError:true,message:"Model returned empty content. No answer fabricated.",_diag:diag()};
   }
@@ -146,7 +160,7 @@ export async function generateTestPlan({ businessRequirement = BUSINESS_REQUIREM
     else parsed._diag = diag();
     return parsed;
   } catch {
-    if(first.finishReason==="length") return await retryAfterTruncation({url,apiKey,model,messages,fetchImpl,initial,retryBudget});
+    if(first.finishReason==="length") return await retryAfterTruncation({url,apiKey,model,messages,fetchImpl,provider,initial,retryBudget});
     return { __modelError: true, message: "Model returned malformed JSON. No answer fabricated.",_diag:diag() };
   }
 }

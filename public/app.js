@@ -10,11 +10,12 @@ const approveBtn=document.getElementById("approveBtn");
 const approvalHint=document.getElementById("approvalHint");
 const modelBadge=document.getElementById("modelBadge");
 const liveBadge=document.getElementById("liveBadge");
-let state={businessRequirement:"",plan:null,approvalToken:null,modelLabel:"",modelId:""};
+let state={businessRequirement:"",plan:null,approvalToken:null,modelLabel:"",modelId:"",configuredProvider:"META",configuredModel:""};
 let lastReport=null;
+let interpretSeq=0;
 async function loadConfig(){
   const r=await fetch("/api/config"); const j=await r.json();
-  reqEl.value=j.businessRequirement; modelBadge.textContent="model: "+j.model;
+  reqEl.value=j.businessRequirement; state.configuredProvider=(j.provider||"META"); state.configuredModel=(j.model||"unknown"); modelBadge.textContent=state.configuredProvider+" · "+state.configuredModel; modelBadge.title="Configured live model";
   state.businessRequirement=j.businessRequirement;
 }
 loadConfig();
@@ -94,7 +95,10 @@ async function doInterpret(useRecorded=false){
       renderPlanSequence(j.plan);
       state.businessRequirement=snapshotReq;
       state.plan=j.plan; state.approvalToken=j.approvalToken; state.modelLabel=j.modelLabel; state.modelId=j.modelId;
-      modelBadge.textContent="model: "+j.modelId; liveBadge.textContent=j.live?"LIVE META RESPONSE":"RECORDED META RESPONSE";
+      if(j.live){ modelBadge.textContent=state.configuredProvider+" · "+(j.modelId||state.configuredModel); }
+      else { modelBadge.textContent="RECORDED · "+(j.modelId||"unknown")+" (live cfg: "+state.configuredProvider+" · "+state.configuredModel+")"; }
+      liveBadge.textContent=j.live?"LIVE META RESPONSE":"RECORDED META RESPONSE";
+      liveBadge.className="badge";
       liveBadge.style.background=j.live?"#12331a":"#33270f";
       approvalHint.textContent="Server-issued authorization granted. Click Approve & Run.";
       approveBtn.disabled=false;

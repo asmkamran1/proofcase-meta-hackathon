@@ -14,8 +14,9 @@ trust when a model is involved.
 
 Given one refund rule, ProofCase:
 
-1. Sends only requirement + bounded catalog to Muse Spark Open via
-   Baseten (`meta-models/muse-spark-open-1026`).
+1. Sends only requirement + bounded catalog to Muse Spark 1.3 via the
+   native Meta Model API (`muse-spark-1.3`), or to Muse Spark Open via
+   Baseten (`meta-models/muse-spark-open-1026`) when `MODEL_PROVIDER=BASETEN`.
 2. Receives STRICT JSON: version, ruleId, businessRequirement,
    interpretedRule, operations (allowlisted, max 8).
 3. Validates structurally and semantically (4-pillar gate: cumulative,
@@ -41,12 +42,13 @@ cd C:\Repo\proofcase-meta-hackathon
 npm install   # zero prod dependencies; verifies package manifest only
 # Create .env.local ONLY if absent; never overwrite an existing file:
 if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
-# set BASETEN_API_KEY in .env.local (never commit it; never print it)
+# set MODEL_API_KEY in .env.local for META live (never commit it; never print it)
+# or set BASETEN_API_KEY with MODEL_PROVIDER=BASETEN for legacy Baseten live
 
 # tests (no API key needed)
 node --test test/
 
-# app (recorded replay needs no key; live inference needs BASETEN_API_KEY)
+# app (recorded replay needs no key; live inference needs selected provider key)
 node --env-file=.env.local src/server.js
 # open http://localhost:8080
 
@@ -63,8 +65,8 @@ node scripts/evaluate.mjs --live       # real inference (capped 20)
 
 | Mode | Label | Source | Cost |
 |---|---|---|---|
-| LIVE | LIVE META RESPONSE (green) | POST /api/interpret via Baseten | Paid |
-| RECORDED | RECORDED META RESPONSE (amber) | docs/recordedResponse.json 2026-10-29 | Free |
+| LIVE | LIVE META RESPONSE (green) | POST /api/interpret via native Meta Model API (muse-spark-1.3), or Baseten legacy when selected | Paid |
+| RECORDED | RECORDED META RESPONSE (amber) | docs/recordedResponse.json 2026-10-29 (historical Muse Spark Open via Baseten) | Free |
 
 Both paths share validation, gate, approval, and executor.
 The demo video uses Recorded as primary and labels it on screen.

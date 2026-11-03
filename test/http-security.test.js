@@ -6,11 +6,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, MAX_BODY_BYTES, clearRateLimitStore } from "../src/server.js";
+import { BUSINESS_REQUIREMENT } from "../src/catalog.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
-function startServer() {
-  const server = createServer({ port: 0 });
+function startServer(opts = {}) {
+  const server = createServer({ port: 0, ...opts });
   return new Promise((resolve, reject) => {
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
@@ -19,7 +20,14 @@ function startServer() {
     server.on("error", reject);
   });
 }
-function closeServer(server) { return new Promise((r) => server.close(r)); }
+function closeServer(server) {
+  return new Promise((r) => {
+    try {
+      if (server.closeAllConnections) server.closeAllConnections();
+    } catch {}
+    server.close(r);
+  });
+}
 function httpReq({ port, method = "GET", path = "/", headers = {}, body = null }) {
   return new Promise((resolve, reject) => {
     const opts = { host: "127.0.0.1", port, method, path, headers };
@@ -320,19 +328,63 @@ test("unknown API route rejected and no unauthorized request invokes live infere
   } finally { await closeServer(server); }
 });
 test("rate limiting for live inference is enforced after security validation", async () => {
-  const { server, port } = await startServer();
+  let mockCalls = 0;
+  const livePlanFor = (req) => ({
+    version: "1.0",
+    ruleId: "refund-cap",
+    businessRequirement: req,
+    interpretedRule: "The sum of all accepted refunds for an order must never exceed its captured payment amount.",
+    operations: [
+      { op: "createOrder", orderId: "order-1", capturedCents: 10000 },
+      { op: "requestRefund", orderId: "order-1", amountCents: 4000, refundId: "r1" },
+      { op: "assertRefundStatus", refundId: "r1", expectedStatus: "accepted" },
+      { op: "assertTotalRefunds", orderId: "order-1", expectedCents: 4000 },
+      { op: "requestRefund", orderId: "order-1", amountCents: 7000, refundId: "r2" },
+      { op: "assertRefundStatus", refundId: "r2", expectedStatus: "rejected" },
+      { op: "assertTotalRefunds", orderId: "order-1", expectedCents: 4000 },
+    ],
+    _diag: { modelId: "muse-spark-1.3", finishReason: "stop" },
+  });
+  const mockGenerate = async ({ businessRequirement }) => {
+    mockCalls += 1;
+    return livePlanFor(businessRequirement);
+  };
+  const { server, port } = await startServer({ generateTestPlan: mockGenerate });
   try {
     clearRateLimitStore();
-    const body = JSON.stringify({ businessRequirement: "Total accepted refunds for an order cannot exceed captured payment." });
-    for (let i = 0; i < 11; i++) {
-      const r = await httpReq({
-        port, method: "POST", path: "/api/interpret",
-        headers: { Host: `localhost:${port}`, Origin: `http://localhost:${port}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-        body,
-      });
-      if (r.statusCode === 429) { assert.equal(parseJsonRes(r).code, "RATE_LIMITED"); break; }
-      assert.ok([200, 429].includes(r.statusCode));
+    mockCalls = 0;
+    const liveBody = JSON.stringify({ businessRequirement: BUSINESS_REQUIREMENT });
+    const liveHeaders = () => ({
+      Host: `localhost:${port}`,
+      Origin: `http://localhost:${port}`,
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(liveBody),
+    });
+    // Ten permitted live requests reach the injected mock provider.
+    for (let i = 0; i < 10; i++) {
+      const r = await httpReq({ port, method: "POST", path: "/api/interpret", headers: liveHeaders(), body: liveBody });
+      assert.equal(r.statusCode, 200, `live request ${i + 1} should succeed`);
+      const j = parseJsonRes(r);
+      assert.equal(j.status, "VALID");
+      assert.equal(j.live, true);
+      assert.equal(mockCalls, i + 1, "each permitted live request must invoke mock once");
     }
+    assert.equal(mockCalls, 10);
+    // Recorded replay does not consume the live request allowance.
+    const recordedBody = JSON.stringify({ businessRequirement: BUSINESS_REQUIREMENT, useRecorded: true });
+    const rr = await httpReq({
+      port, method: "POST", path: "/api/interpret",
+      headers: { Host: `localhost:${port}`, Origin: `http://localhost:${port}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(recordedBody) },
+      body: recordedBody,
+    });
+    assert.equal(rr.statusCode, 200);
+    assert.equal(parseJsonRes(rr).live, false);
+    assert.equal(mockCalls, 10, "recorded replay must not invoke mock provider");
+    // Eleventh live request is rejected without invoking the mock provider.
+    const blocked = await httpReq({ port, method: "POST", path: "/api/interpret", headers: liveHeaders(), body: liveBody });
+    assert.equal(blocked.statusCode, 429);
+    assert.equal(parseJsonRes(blocked).code, "RATE_LIMITED");
+    assert.equal(mockCalls, 10, "rejected request must not invoke mock provider");
   } finally {
     clearRateLimitStore();
     await closeServer(server);

@@ -18,7 +18,14 @@ function startServer(opts = {}) {
     server.on("error", reject);
   });
 }
-function closeServer(server) { return new Promise((r) => server.close(r)); }
+function closeServer(server) {
+  return new Promise((r) => {
+    try {
+      if (server.closeAllConnections) server.closeAllConnections();
+    } catch {}
+    server.close(r);
+  });
+}
 function httpReq(o) {
   return new Promise((resolve, reject) => {
     const req = http.request({ host: "127.0.0.1", port: o.port, method: o.method || "GET", path: o.path || "/", headers: o.headers || {} }, (res) => {

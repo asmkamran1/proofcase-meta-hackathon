@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --import ./test/helpers/offline-guard.js --test test/approval-security.test.js test/evaluation.test.js test/executor.test.js test/hardening-regression.test.js test/http-security.test.js test/meta-provider.test.js test/offline-guard.test.js test/planner.test.js test/provider-config.test.js test/recorded-gate.test.js test/refundService.test.js test/sprint2.test.js test/sprint3.1.test.js test/timeline.test.js test/validator.test.js",
+    "test:offline": "node --import ./test/helpers/offline-guard.js --test test/approval-security.test.js test/evaluation.test.js test/executor.test.js test/hardening-regression.test.js test/http-security.test.js test/meta-provider.test.js test/offline-guard.test.js test/planner.test.js test/provider-config.test.js test/recorded-gate.test.js test/refundService.test.js test/sprint2.test.js test/sprint3.1.test.js test/timeline.test.js test/validator.test.js",
     "feasibility": "node scripts/runFeasibility.js",
     "start": "node src/server.js",
     "dev": "node --env-file=.env.local src/server.js"

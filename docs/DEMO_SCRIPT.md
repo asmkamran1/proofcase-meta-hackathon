@@ -13,14 +13,14 @@ buggy vs corrected, evidence export, and safety behavior.
 
 ## Labels Required
 
-- RECORDED: "RECORDED Muse Spark response 2026-10-29" (amber badge + caption)
-- LIVE: "LIVE Muse Spark via Baseten -- date" (green badge + caption)
+- RECORDED: "RECORDED Muse Spark response 2026-10-29" (amber badge + caption; historical Muse Spark Open via Baseten)
+- LIVE: "LIVE Muse Spark 1.3 via Meta Model API -- date" (green badge + caption; legacy Baseten only when explicitly selected)
 - At least once: "Seeded fictional defect -- not production"
 - Closing: "New work Oct 26 -- Nov 4, 2026"
 
 ## Browser Prep
 
-1. Copy only if absent; never overwrite: if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local } and set BASETEN_API_KEY if doing live.
+1. Copy only if absent; never overwrite: if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local } and set MODEL_API_KEY if doing live (BASETEN_API_KEY only with MODEL_PROVIDER=BASETEN).
 2. node --env-file=.env.local src/server.js -- open http://localhost:8080 (loopback only).
 3. Refresh, confirm default requirement visible.
 4. Have recordedResponse.json tab ready as backup.
@@ -30,7 +30,7 @@ buggy vs corrected, evidence export, and safety behavior.
 
 ### 0:00-0:20 -- Title and Problem (20s)
 
-Show: header "ProofCase -- Refund Invariant Demo with Muse Spark Open".
+Show: header "Proofcase -- Refund Invariant Demo with Meta Muse Spark".
 
 Narrate: "Business requirements live in natural language. ProofCase shows
 how Meta Muse Spark Open turns one refund rule into a validated, human-

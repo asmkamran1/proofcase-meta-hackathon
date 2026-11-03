@@ -11,18 +11,29 @@ node --version   # >=20
 npm --version
 ```
 
-## 1. Full Test Suite (111 tests, all green per 2026-11-02 H3 run)
+## 1. Full Test Suite (151 tests, all green per 2026-11-03 M1.1 run)
 
 ```powershell
-node --test test/
-# expect: 111/111 pass, 0 fail, 0 skipped, 0 cancelled.
+npm test
+# expect: 151/151 pass, 0 fail, 0 skipped, 0 cancelled.
+# Command enumerates every test file with the guard preloaded:
+# node --import ./test/helpers/offline-guard.js --test <15 files>
+# (explicit file list because PowerShell does not expand test/*.test.js
+# and bare `test/` also picked up the helper as a phantom 152nd entry).
+# The --import preloads test/helpers/offline-guard.js, which throws
+# OFFLINE_GUARD_BLOCKED on any non-loopback fetch/http/dns provider call
+# while allowing 127.0.0.1 loopback test servers.
 # Breakdown: approval-security 18, evaluation 10, executor 4,
-# hardening-regression (H3) 5, http-security 16, planner 3,
-# recorded-gate 16, refundService 2, sprint2 11, sprint3.1 14,
-# timeline 8, validator 4.
-# Reconciles the prior H2 "93/106" inconsistency: that report mixed
-# file subtotals and omitted the evaluator/planner/executor/validator/
-# refundService/timeline/sprint2/sprint3.1 files. Full-suite evidence is 111.
+# hardening-regression (H3) 5, http-security 16, meta-provider 26,
+# offline-guard 4, planner 3, provider-config 10, recorded-gate 16,
+# refundService 2, sprint2 11, sprint3.1 14, timeline 8, validator 4.
+# Prior H3 baseline was 111; M1 added 36 provider tests (26 meta-provider
+# + 10 provider-config) and M1.1 added 4 offline-guard tests.
+# 111 + 36 + 4 = 151. The http-security rate-limit test was repaired in
+# place (still 16 in that file) to use an injected mock and assert
+# 10x200 + recorded replay + 1x429 with mock-call accounting.
+# Suite completes in ~1s offline; any live provider call throws
+# OFFLINE_GUARD_BLOCKED and fails instead of spending credits.
 ```
 
 ## 2. Syntax and Package Checks
@@ -101,7 +112,9 @@ node -e "import fs from 'node:fs'; import {validateTestPlan,normalizePlan} from 
 ## 8. Optional Live Inference
 
 ```powershell
-# Paid; capped 20 requests; requires BASETEN_API_KEY
+# Paid; capped 20 requests; requires selected provider key
+# (MODEL_API_KEY for META default; BASETEN_API_KEY with MODEL_PROVIDER=BASETEN)
+# No live calls were made during M1 migration; default evaluation stays offline.
 node scripts/runFeasibility.js            # single canonical requirement, writes docs/MODEL_RUN.md
 node scripts/evaluate.mjs --live          # 10-case suite, archives prior live to docs/archive/
 node scripts/evaluate.mjs --live --verbose

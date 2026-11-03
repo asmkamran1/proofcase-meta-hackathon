@@ -19,8 +19,8 @@
 - **Verification:** `Select-String -Pattern b10_` over `docs/*`, `src/*`,
   `public/*`, `fixtures/*` returned no matches -- no key leaked into
   generated reports, fixtures, or code.
-- **`.env.example` is clean:** contains `BASETEN_API_KEY=` empty value
-  plus commented guidance; safe to publish.
+- **`.env.example` is clean:** contains empty `MODEL_API_KEY=` plus
+  commented Baseten legacy values; safe to publish.
 - **Provider hints truncated:** `metaClient.js` and `planner.js` truncate
   provider error messages to 200 chars on 4xx/5xx and never include the
   key or prompt.

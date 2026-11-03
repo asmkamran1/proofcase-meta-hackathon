@@ -10,9 +10,10 @@ Defect is intentionally seeded and fictional.
 
 - catalog.js -- allowlisted ops/fields/bounds, BUSINESS_REQUIREMENT,
   catalogDescription() sent to Meta. Single ruleId refund-cap.
-- metaClient.js -- server-side Baseten Muse Spark Open client, no
-  fallback. Provides resolveBudgets(), postChat(), retry, _diag.
-  Default 4096, retry ~2x capped 16384, max 2 attempts.
+- metaClient.js -- server-side multi-provider model client (META native
+  Model API default `muse-spark-1.3`; BASETEN legacy Muse Spark Open),
+  no fallback. Provides modelConfig(), resolveBudgets(), postChat(),
+  retry, _diag. Default 4096, retry ~2x capped 16384, max 2 attempts.
 - planner.js -- builds prompt with requirement + catalog only, never
   discloses bug. Extracts JSON, unwraps wrapped ops, attaches _diag.
 - testPlanValidator.js -- bounded contract: version, ruleId, 2..8 ops,
@@ -48,7 +49,7 @@ Defect is intentionally seeded and fictional.
 
 ## 3. Flow
 
-1. Requirement + catalog -> Muse Spark Open via Baseten (or recordedResponse.json)
+1. Requirement + catalog -> Muse Spark 1.3 via native Meta Model API by default (Muse Spark Open via Baseten when MODEL_PROVIDER=BASETEN; or recordedResponse.json)
 2. normalize + validate (structural: version, ruleId, 2..8 ops, allowlist + bounds + refs)
 3. semantic gate (bounded keyword eligibility: cumulative + accepted + per-order + captured; reversed/strict/equality/vague-cap fail-closed; plus interpretedRule + plan exceed-cap shape)
 4. server-issued HMAC execution authorization (per-instance key, 15-min TTL; binds canonical requirement + normalized plan + provenance + modelId)

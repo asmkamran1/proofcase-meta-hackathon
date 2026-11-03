@@ -1,11 +1,11 @@
-// Server-side Baseten API client (Meta inference only).
+// Server-side multi-provider model client (META native + BASETEN legacy).
 // No fallback providers. No client-side key exposure.
-
-// Muse Spark Open uses reasoning tokens that count against the output budget.
-// A small max_tokens budget truncates the final answer (finish_reason="length")
-// leaving choices[0].message.content empty. The default budget covers
-// reasoning + concise structured JSON. One bounded retry with a higher budget
-// recovers confirmed truncation only. All other params stay provider-compatible.
+//
+// META (default for new installs): https://api.meta.ai/v1, muse-spark-1.3,
+// max_completion_tokens, no temperature override, JSON Schema output.
+// BASETEN (legacy): temperature:0, max_tokens, json_object (unchanged).
+// Shared: bounded budgets, one truncation-only retry, finite upstream
+// timeout, sanitized diagnostics, no fabricated plans.
 const DEFAULT_OUTPUT_TOKENS = 4096;
 const RETRY_OUTPUT_TOKENS = 8192;
 const MAX_OUTPUT_TOKENS = 16384;
@@ -15,14 +15,100 @@ const MIN_OUTPUT_TOKENS = 1024;
 const LEGACY_BUDGET = 2048;
 const MAX_ATTEMPTS = 2;
 
-const DEFAULT_BASE_URL = "https://inference.baseten.co/v1";
-const DEFAULT_MODEL = "meta-models/muse-spark-open-1026";
+// Finite upstream inference timeout: abort safely, no uncertain retry.
+const UPSTREAM_TIMEOUT_MS = 60000;
 
-function config() {
+const DEFAULT_META_BASE_URL = "https://api.meta.ai/v1";
+const DEFAULT_META_MODEL = "muse-spark-1.3";
+const DEFAULT_BASETEN_BASE_URL = "https://inference.baseten.co/v1";
+const DEFAULT_BASETEN_MODEL = "meta-models/muse-spark-open-1026";
+
+// Permissive JSON Schema for META structured output. Deliberately loose so
+// both the normal refund plan and {unsupported:true, reason} pass provider
+// validation. Local testPlanValidator remains authoritative.
+const TEST_PLAN_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    version: { type: "string" },
+    ruleId: { type: "string" },
+    businessRequirement: { type: "string" },
+    interpretedRule: { type: "string" },
+    operations: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          op: { type: "string" },
+          orderId: { type: "string" },
+          capturedCents: { type: "number" },
+          amountCents: { type: "number" },
+          refundId: { type: "string" },
+          expectedCents: { type: "number" },
+          expectedStatus: { type: "string" },
+        },
+        required: ["op"],
+        additionalProperties: true,
+      },
+    },
+    unsupported: { type: "boolean" },
+    reason: { type: "string" },
+  },
+  additionalProperties: true,
+};
+
+function isLoopbackHostname(hostname) {
+  const h = String(hostname || "").toLowerCase();
+  return h === "127.0.0.1" || h === "localhost" || h === "::1" || h === "[::1]";
+}
+
+function sanitizeBaseUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!s) throw new Error("Empty model base URL.");
+  let u;
+  try {
+    u = new URL(s);
+  } catch {
+    throw new Error("Malformed model base URL.");
+  }
+  if (u.username || u.password) throw new Error("Model base URL must not embed credentials.");
+  if (u.search && u.search !== "") throw new Error("Model base URL must not contain a query string.");
+  if (u.hash && u.hash !== "") throw new Error("Model base URL must not contain a fragment.");
+  const proto = u.protocol.toLowerCase();
+  if (proto !== "https:" && !(proto === "http:" && isLoopbackHostname(u.hostname))) {
+    throw new Error("Model base URL must use HTTPS.");
+  }
+  let path = u.pathname.replace(/\/+$/, "");
+  if (!path.toLowerCase().endsWith("/chat/completions")) {
+    path = `${path}/chat/completions`;
+  }
+  path = path.replace(/\/v1\/v1(\/|$)/, "/v1$1");
+  const port = u.port ? `:${u.port}` : "";
+  return `${u.protocol}//${u.hostname}${port}${path}`;
+}
+
+function sanitizeBaseForConfig(raw) {
+  const s = String(raw || "").trim();
+  try {
+    const u = new URL(s);
+    const port = u.port ? `:${u.port}` : "";
+    const path = u.pathname.replace(/\/+$/, "") || "/";
+    return `${u.protocol}//${u.hostname}${port}${path}`;
+  } catch {
+    return "[invalid-url]";
+  }
+}
+
+function basetenOnlyConfig() {
   const apiKey = process.env.BASETEN_API_KEY;
-  const baseUrl = (process.env.BASETEN_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
-  const model = process.env.BASETEN_MODEL || DEFAULT_MODEL;
+  const rawBase = process.env.BASETEN_BASE_URL || DEFAULT_BASETEN_BASE_URL;
+  const baseUrl = String(rawBase).trim().replace(/\/+$/, "");
+  const model = process.env.BASETEN_MODEL || DEFAULT_BASETEN_MODEL;
   return { apiKey, baseUrl, model };
+}
+
+// Legacy alias: Baseten-only, never returns Meta configuration.
+function config() {
+  return basetenOnlyConfig();
 }
 
 function parseBudget(raw, fallback) {
@@ -41,13 +127,20 @@ function clampBudget(n, fallback) {
   return i;
 }
 
-// Configurable output budget. Precedence: per-call maxTokens, then
-// BASETEN_MAX_TOKENS env, then DEFAULT_OUTPUT_TOKENS. Retry budget is the
-// explicit BASETEN_RETRY_MAX_TOKENS env when higher than initial, otherwise
-// roughly double initial (capped). Never exceeds MAX_OUTPUT_TOKENS.
-function resolveBudgets({ maxTokens } = {}) {
-  const envInitial = parseBudget(process.env.BASETEN_MAX_TOKENS, null);
-  const envRetry = parseBudget(process.env.BASETEN_RETRY_MAX_TOKENS, null);
+// Configurable output budget. Precedence: per-call maxTokens, then provider env, then default.
+// META reads META_* / MODEL_* only; BASETEN reads BASETEN_* only. Stale
+// Baseten values never override an explicitly selected META configuration.
+function resolveBudgets({ maxTokens, provider } = {}) {
+  const p = String(provider || process.env.MODEL_PROVIDER || "").trim().toUpperCase();
+  const isMeta = p === "" || p === "META";
+  const envInitialRaw = isMeta
+    ? (process.env.META_MAX_TOKENS ?? process.env.MODEL_MAX_TOKENS ?? null)
+    : (process.env.BASETEN_MAX_TOKENS ?? null);
+  const envRetryRaw = isMeta
+    ? (process.env.META_RETRY_MAX_TOKENS ?? process.env.MODEL_RETRY_MAX_TOKENS ?? null)
+    : (process.env.BASETEN_RETRY_MAX_TOKENS ?? null);
+  const envInitial = parseBudget(envInitialRaw, null);
+  const envRetry = parseBudget(envRetryRaw, null);
   const fromArg = clampBudget(typeof maxTokens === "number" ? maxTokens : NaN, null);
   const initial = fromArg ?? envInitial ?? DEFAULT_OUTPUT_TOKENS;
   let retry = envRetry;
@@ -56,6 +149,57 @@ function resolveBudgets({ maxTokens } = {}) {
     if (retry <= initial) retry = Math.min(initial + 1024, MAX_OUTPUT_TOKENS);
   }
   return { initial, retry };
+}
+
+// Explicit provider configuration, server-side only. Defaults to META.
+// Throws on unknown provider or unsafe endpoint. Missing keys return
+// undefined so callers emit sanitized errors; never cross-provider fallback.
+function modelConfig() {
+  const rawProvider = process.env.MODEL_PROVIDER;
+  const provider = rawProvider == null || String(rawProvider).trim() === "" ? "META" : String(rawProvider).trim().toUpperCase();
+  if (provider !== "META" && provider !== "BASETEN") {
+    throw new Error(`Unknown MODEL_PROVIDER "${String(rawProvider).slice(0, 32)}". Expected META or BASETEN.`);
+  }
+  if (provider === "META") {
+    const apiKey = process.env.MODEL_API_KEY;
+    const rawBase = process.env.META_BASE_URL || DEFAULT_META_BASE_URL;
+    const model = process.env.META_MODEL || DEFAULT_META_MODEL;
+    const chatUrl = sanitizeBaseUrl(rawBase);
+    const baseUrl = String(rawBase).trim().replace(/\/+$/, "");
+    return { provider, apiKey, baseUrl, model, chatUrl };
+  }
+  const apiKey = process.env.BASETEN_API_KEY;
+  const rawBase = process.env.BASETEN_BASE_URL || DEFAULT_BASETEN_BASE_URL;
+  const model = process.env.BASETEN_MODEL || DEFAULT_BASETEN_MODEL;
+  const chatUrl = sanitizeBaseUrl(rawBase);
+  const baseUrl = String(rawBase).trim().replace(/\/+$/, "");
+  return { provider, apiKey, baseUrl, model, chatUrl };
+}
+
+// Safe diagnostics only: provider, model, sanitized endpoint, hasKey.
+function describeConfig() {
+  const cfg = modelConfig();
+  return { provider: cfg.provider, model: cfg.model, baseUrl: sanitizeBaseForConfig(cfg.baseUrl), hasKey: !!cfg.apiKey };
+}
+
+// Centralized provider-specific Chat Completions bodies.
+// META: max_completion_tokens, no temperature, JSON Schema output.
+// BASETEN: legacy shape (temperature 0, max_tokens, json_object).
+function buildChatRequestBody({ provider, model, messages, budget }) {
+  if (provider === "META") {
+    return { model, max_completion_tokens: budget, response_format: { type: "json_schema", json_schema: { name: "refund_test_plan", strict: false, schema: TEST_PLAN_JSON_SCHEMA } }, messages };
+  }
+  return { model, temperature: 0, max_tokens: budget, response_format: { type: "json_object" }, messages };
+}
+
+async function postChatWithTimeout({ url, apiKey, body, fetchImpl }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => { try { controller.abort(); } catch {} }, UPSTREAM_TIMEOUT_MS);
+  try {
+    return await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function buildPrompt({ question, profile }) {
@@ -157,34 +301,19 @@ function pickNumber(...candidates) {
   return null;
 }
 
-async function postChat({ url, apiKey, model, messages, budget, fetchImpl }) {
-  const body = {
-    model,
-    temperature: 0,
-    max_tokens: budget,
-    response_format: { type: "json_object" },
-    messages
-  };
-  // NOTE: no reasoning_effort param sent. Compatibility with the Baseten
-  // hackathon model is unverified, so the default reasoning behavior is kept.
-  const res = await fetchImpl(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-  return res;
+async function postChat({ url, apiKey, model, messages, budget, fetchImpl, provider }) {
+  const resolvedProvider = provider || modelConfig().provider;
+  const body = buildChatRequestBody({ provider: resolvedProvider, model, messages, budget });
+  return await postChatWithTimeout({ url, apiKey, body, fetchImpl });
 }
 
 // One bounded retry with a higher budget, same provider/model/messages.
 // Never retries HTTP errors, refusals, malformed JSON (stop), validation
 // failures, or ordinary empty content. At most 2 total attempts.
-async function retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, initial, retryBudget, exhausted, partialJson }) {
+async function retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, provider, initial, retryBudget, exhausted, partialJson }) {
   let res2;
   try {
-    res2 = await postChat({ url, apiKey, model, messages, budget: retryBudget, fetchImpl });
+    res2 = await postChat({ url, apiKey, model, messages, budget: retryBudget, fetchImpl, provider });
   } catch (err) {
     return {
       __modelError: true,
@@ -265,22 +394,30 @@ async function retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, i
 }
 
 export async function interpretWithMeta({ question, profile, fetchImpl = fetch, maxTokens } = {}) {
-  const { apiKey, baseUrl, model } = config();
-  if (!apiKey) {
-    return { __modelError: true, message: "Missing BASETEN_API_KEY. Set it in .env.local (never commit it)." };
+  let cfg;
+  try {
+    cfg = modelConfig();
+  } catch {
+    return { __modelError: true, message: "Model configuration error. No answer fabricated." };
   }
-  const budgets = resolveBudgets({ maxTokens });
+  const { apiKey, model, chatUrl, provider } = cfg;
+  if (!apiKey) {
+    const hint = provider === "META" ? "Missing MODEL_API_KEY. Set it in .env.local (never commit it)." : "Missing BASETEN_API_KEY. Set it in .env.local (never commit it).";
+    return { __modelError: true, message: hint };
+  }
+  const budgets = resolveBudgets({ maxTokens, provider });
   const initial = budgets.initial;
   const retryBudget = budgets.retry;
-  const url = `${baseUrl}/chat/completions`;
+  const url = chatUrl;
   const messages = buildPrompt({ question, profile });
   let res;
   try {
-    res = await postChat({ url, apiKey, model, messages, budget: initial, fetchImpl });
+    res = await postChat({ url, apiKey, model, messages, budget: initial, fetchImpl, provider });
   } catch (err) {
+    const msg = err && err.name === "AbortError" ? "Model request timed out. No answer fabricated." : `Model request failed: ${err.message}`;
     return {
       __modelError: true,
-      message: `Model request failed: ${err.message}`,
+      message: msg,
       _diag: buildDiag({ httpStatus: null, modelId: null, finishReason: null, completionTokens: null, reasoningTokens: null, hasContent: false, outputBudget: initial, attempts: 1, retried: false })
     };
   }
@@ -325,7 +462,7 @@ export async function interpretWithMeta({ question, profile, fetchImpl = fetch, 
     // Never use reasoning_content as the final answer; it is private trace,
     // not the validated JSON contract.
     if (isConfirmedTruncation({ hasContent: false, finishReason: first.finishReason, completionTokens: first.completionTokens, budgetUsed: initial })) {
-      return await retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, initial, retryBudget, exhausted: isBudgetExhausted(first.completionTokens, initial) && first.finishReason !== "length", partialJson: false });
+      return await retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, provider, initial, retryBudget, exhausted: isBudgetExhausted(first.completionTokens, initial) && first.finishReason !== "length", partialJson: false });
     }
     return { __modelError: true, message: "Model returned empty content. No answer fabricated.", _diag: diag() };
   }
@@ -335,7 +472,7 @@ export async function interpretWithMeta({ question, profile, fetchImpl = fetch, 
     // Truncated partial JSON (finish_reason=length) qualifies for one retry.
     // Ordinary malformed JSON with finish_reason=stop never retries.
     if (first.finishReason === "length") {
-      return await retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, initial, retryBudget, exhausted: false, partialJson: true });
+      return await retryAfterTruncation({ url, apiKey, model, messages, fetchImpl, provider, initial, retryBudget, exhausted: false, partialJson: true });
     }
     return { __modelError: true, message: "Model returned malformed JSON. No answer fabricated.", _diag: diag() };
   }
@@ -349,5 +486,15 @@ export {
   MIN_OUTPUT_TOKENS,
   MAX_ATTEMPTS,
   LEGACY_BUDGET,
-  resolveBudgets
+  UPSTREAM_TIMEOUT_MS,
+  DEFAULT_META_BASE_URL,
+  DEFAULT_META_MODEL,
+  DEFAULT_BASETEN_BASE_URL,
+  DEFAULT_BASETEN_MODEL,
+  TEST_PLAN_JSON_SCHEMA,
+  resolveBudgets,
+  modelConfig,
+  describeConfig,
+  buildChatRequestBody,
+  sanitizeBaseUrl,
 };

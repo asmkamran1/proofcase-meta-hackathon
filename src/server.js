@@ -7,7 +7,7 @@ import { generateTestPlan } from "./planner.js";
 import { normalizePlan, validateTestPlan } from "./testPlanValidator.js";
 import { executePlan } from "./executor.js";
 import { approvalHash, verifyApproval, createSigningKey, issueAuthorization, verifyAuthorization, canonicalRequirement } from "./approval.js";
-import { basetenConfig } from "./metaClient.js";
+import { modelConfig, describeConfig } from "./metaClient.js";
 import { checkSemanticEligibility } from "./semanticGate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -523,8 +523,14 @@ export function createServer(opts = {}) {
     }
     try {
       if (req.method === "GET" && pathname === "/api/config") {
-        const cfg = basetenConfig();
-        sendJson(res, 200, { businessRequirement: BUSINESS_REQUIREMENT, model: cfg.model, hasKey: !!cfg.apiKey });
+        let payload;
+        try {
+          payload = describeConfig();
+        } catch {
+          const fallbackProvider = String(process.env.MODEL_PROVIDER || "").trim().toUpperCase() || "META";
+          payload = { provider: fallbackProvider, model: null, hasKey: false };
+        }
+        sendJson(res, 200, { businessRequirement: BUSINESS_REQUIREMENT, ...payload });
         return;
       }
       if (req.method === "GET" && pathname === "/api/recorded") {
@@ -608,7 +614,11 @@ export function createServer(opts = {}) {
           sendJson(res, 200, { status: gate.status, message: gate.reason, plan: normalized, code: gate.status, missing: gate.missing, evidence: gate.evidence, unverified: true, requiresConfirmation: true, _diag: normalized._diag || null });
           return;
         }
-        const modelId = normalized._diag?.modelId || basetenConfig().model;
+        let configuredModel = null;
+        try { configuredModel = modelConfig().model; } catch { configuredModel = null; }
+        // Trusted identity: prefer the verified provider response, fall back
+        // to server-side configured model. Never trust client-supplied IDs.
+        const modelId = normalized._diag?.modelId || configuredModel || "";
         const liveToken = issueAuthorization({ businessRequirement, plan: normalized, provenance: "LIVE", modelId, now: nowFn() }, { key: signingKey });
         sendJson(res, 200, { status: "VALID", plan: normalized, approvalToken: liveToken, interpretedRule: normalized.interpretedRule, modelLabel: "LIVE META RESPONSE", modelId, live: true, _diag: normalized._diag || null, gate });
         return;

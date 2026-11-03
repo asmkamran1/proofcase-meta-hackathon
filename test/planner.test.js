@@ -3,6 +3,43 @@ import assert from "node:assert/strict";
 import { generateTestPlan, BUSINESS_REQUIREMENT } from "../src/planner.js";
 import { validateTestPlan } from "../src/testPlanValidator.js";
 
+// Snapshot every provider-related key so local .env.local contents,
+// stale PowerShell exports, and parallel test files cannot leak into
+// assertions. Each test clears then sets an explicit META test env.
+const KEYS = [
+  "MODEL_PROVIDER",
+  "MODEL_API_KEY",
+  "META_MODEL",
+  "META_BASE_URL",
+  "META_MAX_TOKENS",
+  "META_RETRY_MAX_TOKENS",
+  "MODEL_MAX_TOKENS",
+  "MODEL_RETRY_MAX_TOKENS",
+  "BASETEN_API_KEY",
+  "BASETEN_BASE_URL",
+  "BASETEN_MODEL",
+  "BASETEN_MAX_TOKENS",
+  "BASETEN_RETRY_MAX_TOKENS",
+];
+const snapEnv = () => {
+  const s = {};
+  for (const k of KEYS) s[k] = process.env[k];
+  return s;
+};
+const restoreEnv = (s) => {
+  for (const k of KEYS) {
+    if (s[k] === undefined) delete process.env[k];
+    else process.env[k] = s[k];
+  }
+};
+const clearEnv = () => {
+  for (const k of KEYS) delete process.env[k];
+};
+function withMetaTestEnv() {
+  process.env.MODEL_PROVIDER = "META";
+  process.env.MODEL_API_KEY = "test-key";
+}
+
 function mockFetchForValidPlan() {
   const plan = {
     version: "1.0",
@@ -30,8 +67,7 @@ function mockFetchForValidPlan() {
 }
 
 test("planner sends requirement and catalog, parses valid plan (mocked, no bug disclosed)", async () => {
-  const prev = process.env.BASETEN_API_KEY;
-  process.env.BASETEN_API_KEY = "test-key";
+  const s = snapEnv(); clearEnv(); withMetaTestEnv();
   try {
     let sentBody = null;
     const fetchImpl = async (url, opts) => {
@@ -48,14 +84,12 @@ test("planner sends requirement and catalog, parses valid plan (mocked, no bug d
     assert.ok(!promptStr.toLowerCase().includes("buggy"));
     assert.ok(!promptStr.toLowerCase().includes("seeded"));
   } finally {
-    if (prev === undefined) delete process.env.BASETEN_API_KEY;
-    else process.env.BASETEN_API_KEY = prev;
+    restoreEnv(s);
   }
 });
 
 test("malformed model output handled as model error", async () => {
-  const prev = process.env.BASETEN_API_KEY;
-  process.env.BASETEN_API_KEY = "test-key";
+  const s = snapEnv(); clearEnv(); withMetaTestEnv();
   try {
     const fetchImpl = async () => ({
       ok: true,
@@ -70,14 +104,12 @@ test("malformed model output handled as model error", async () => {
     assert.equal(out.__modelError, true);
     assert.match(out.message, /malformed JSON/);
   } finally {
-    if (prev === undefined) delete process.env.BASETEN_API_KEY;
-    else process.env.BASETEN_API_KEY = prev;
+    restoreEnv(s);
   }
 });
 
 test("unsupported requirement returns marker", async () => {
-  const prev = process.env.BASETEN_API_KEY;
-  process.env.BASETEN_API_KEY = "test-key";
+  const s = snapEnv(); clearEnv(); withMetaTestEnv();
   try {
     const fetchImpl = async () => ({
       ok: true,
@@ -93,7 +125,6 @@ test("unsupported requirement returns marker", async () => {
     assert.equal(v.ok, false);
     assert.equal(v.reason, "UNSUPPORTED_REQUIREMENT");
   } finally {
-    if (prev === undefined) delete process.env.BASETEN_API_KEY;
-    else process.env.BASETEN_API_KEY = prev;
+    restoreEnv(s);
   }
 });

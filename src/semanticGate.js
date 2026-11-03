@@ -50,12 +50,27 @@ function missingPillars(req){
 }
 function planExceedsCap(plan){
   if(!plan||!Array.isArray(plan.operations)) return false;
-  const c=plan.operations.find(o=>o.op==="createOrder");
-  const rf=plan.operations.filter(o=>o.op==="requestRefund");
-  if(!c||typeof c.capturedCents!=="number") return false;
-  if(rf.length<2) return false;
-  const sum=rf.reduce((s,r)=>s+(typeof r.amountCents==="number"?r.amountCents:0),0);
-  return sum>c.capturedCents;
+  const creates = new Map();
+  for (const o of plan.operations) {
+    if (o && o.op === "createOrder" && typeof o.orderId === "string" && typeof o.capturedCents === "number") {
+      if (!creates.has(o.orderId)) creates.set(o.orderId, o.capturedCents);
+    }
+  }
+  if (creates.size === 0) return false;
+  const sums = new Map();
+  const counts = new Map();
+  for (const o of plan.operations) {
+    if (o && o.op === "requestRefund" && typeof o.orderId === "string" && typeof o.amountCents === "number") {
+      sums.set(o.orderId, (sums.get(o.orderId) || 0) + o.amountCents);
+      counts.set(o.orderId, (counts.get(o.orderId) || 0) + 1);
+    }
+  }
+  for (const [orderId, sum] of sums.entries()) {
+    if ((counts.get(orderId) || 0) < 2) continue;
+    const cap = creates.get(orderId);
+    if (typeof cap === "number" && sum > cap) return true;
+  }
+  return false;
 }
 function checkPlanShape(plan){
   if(!plan||!Array.isArray(plan.operations)) return {ok:false,reason:"plan operations missing"};

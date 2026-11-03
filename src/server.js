@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { BUSINESS_REQUIREMENT } from "./catalog.js";
 import { generateTestPlan } from "./planner.js";
+import { ELIGIBLE_PLAN_CONTRACT } from "./metaClient.js";
 import { normalizePlan, validateTestPlan } from "./testPlanValidator.js";
 import { executePlan } from "./executor.js";
 import { approvalHash, verifyApproval, createSigningKey, issueAuthorization, verifyAuthorization, canonicalRequirement } from "./approval.js";
@@ -587,9 +588,38 @@ export function createServer(opts = {}) {
           sendJson(res, 429, { error: "Too many requests", code: "RATE_LIMITED" });
           return;
         }
-        const rawPlan = await generatePlanFn({ businessRequirement });
+        // M1.4 domain preflight: deterministic eligibility before any provider
+        // invocation. No fabricated interpretedRule/plan. Ineligible requirements
+        // never reach the provider, never consume execution authorization.
+        const preflight = checkSemanticEligibility({ businessRequirement });
+        if (!preflight.eligible) {
+          sendJson(res, 200, {
+            status: preflight.status,
+            message: preflight.reason,
+            code: preflight.status,
+            missing: preflight.missing,
+            evidence: preflight.evidence,
+            unverified: true,
+            requiresConfirmation: true,
+          });
+          return;
+        }
+        // M1.5 eligible live path: domain classification is already decided by
+        // the deterministic preflight above. Invoke Meta with the internal
+        // eligible-plan contract (two-field generation, no supported/
+        // unsupported choice). Browser JSON never selects this contract.
+        const rawPlan = await generatePlanFn({ businessRequirement, contract: ELIGIBLE_PLAN_CONTRACT });
         if (rawPlan.__modelError) {
-          sendJson(res, 200, { status: "MODEL_ERROR", message: rawPlan.message, _diag: rawPlan._diag || null, code: "MODEL_ERROR" });
+          const allowedCodes = new Set([
+            "MODEL_TIMEOUT",
+            "MODEL_HTTP_ERROR",
+            "MODEL_REFUSAL",
+            "MODEL_INVALID_OUTPUT",
+            "MODEL_ABSTAINED",
+            "MODEL_ERROR",
+          ]);
+          const publicCode = allowedCodes.has(rawPlan.code) ? rawPlan.code : "MODEL_ERROR";
+          sendJson(res, 200, { status: "MODEL_ERROR", message: rawPlan.message, _diag: rawPlan._diag || null, code: publicCode });
           return;
         }
         const normalized = normalizePlan(rawPlan);
@@ -597,7 +627,15 @@ export function createServer(opts = {}) {
         try { validation = validateTestPlan(normalized); } catch (e) { sendJson(res, 200, { status: "INVALID_PLAN", message: sanitizeError(e), plan: normalized, code: "INVALID_PLAN" }); return; }
         if (!validation.ok) {
           if (validation.reason === "UNSUPPORTED_REQUIREMENT") {
-            sendJson(res, 200, { status: "UNSUPPORTED_REQUIREMENT", message: validation.message, plan: normalized, code: "UNSUPPORTED_REQUIREMENT" });
+            // M1.4: the requirement already passed deterministic preflight.
+            // A model unsupported marker is abstention/failure, never proof the
+            // eligible business rule is out of scope. Never issue authorization.
+            sendJson(res, 200, {
+              status: "MODEL_ERROR",
+              message: "The model did not generate a valid plan for this eligible requirement.",
+              code: "MODEL_ABSTAINED",
+              _diag: normalized._diag || null,
+            });
             return;
           }
           sendJson(res, 200, { status: "INVALID_PLAN", message: validation.message, plan: normalized, code: validation.reason });
@@ -618,9 +656,18 @@ export function createServer(opts = {}) {
         try { configuredModel = modelConfig().model; } catch { configuredModel = null; }
         // Trusted identity: prefer the verified provider response, fall back
         // to server-side configured model. Never trust client-supplied IDs.
-        const modelId = normalized._diag?.modelId || configuredModel || "";
+        // Mismatched mock/test IDs are still reported truthfully; a documented
+        // mismatch note is attached instead of silently misattributing. The
+        // authorization binds the reported modelId either way.
+        const returnedModelId = normalized._diag?.modelId || null;
+        const modelId = returnedModelId || configuredModel || "";
+        const modelMismatch =
+          Boolean(returnedModelId && configuredModel && returnedModelId !== configuredModel);
         const liveToken = issueAuthorization({ businessRequirement, plan: normalized, provenance: "LIVE", modelId, now: nowFn() }, { key: signingKey });
-        sendJson(res, 200, { status: "VALID", plan: normalized, approvalToken: liveToken, interpretedRule: normalized.interpretedRule, modelLabel: "LIVE META RESPONSE", modelId, live: true, _diag: normalized._diag || null, gate });
+        const liveDiag = normalized._diag
+          ? { ...normalized._diag, modelMismatch: modelMismatch || undefined, configuredModel: modelMismatch ? configuredModel : undefined }
+          : normalized._diag || null;
+        sendJson(res, 200, { status: "VALID", plan: normalized, approvalToken: liveToken, interpretedRule: normalized.interpretedRule, modelLabel: "LIVE META RESPONSE", modelId, live: true, _diag: liveDiag, gate });
         return;
       }
       if (req.method === "POST" && pathname === "/api/run") {

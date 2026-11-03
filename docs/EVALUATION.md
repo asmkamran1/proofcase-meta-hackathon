@@ -2,15 +2,30 @@
 
 This document describes the Sprint 3 semantic evaluation suite for the ProofCase refund-cap invariant demo. It is limited to the fictional refund service with deterministic in-memory fixtures. It does not claim general model reliability or arbitrary software correctness.
 
+Maintain a clear separation between offline/mock evaluation, historical
+live Muse Spark Open inference via Baseten, newer native Muse Spark 1.3
+support without new paid evaluation, actual plan validity, semantic
+interpretation, safe abstention, pending human review, and deterministic
+defect exposure.
+
 ## 1. Objective
 
-Assess whether Meta Muse Spark Open can consistently:
+Assess whether the historical Meta Muse Spark Open model via Baseten
+could consistently:
 
 1. Translate natural-language paraphrases of the **single bounded invariant** into a validated JSON test plan using only allowlisted operations.
 2. Correctly reject ambiguous requirements (missing essential business conditions) and unsupported requirements (outside bounded vocabulary) by returning an unsupported marker.
 3. Produce plans that, when executed deterministically against both buggy and correct service variants, expose the seeded cumulative-refund defect.
 
-Workflow: Business requirement -> Meta Muse Spark Open interpretation -> validated test plan -> explicit approval -> deterministic buggy/corrected execution -> reproducible evidence.
+Workflow: Business requirement -> selected Meta Muse Spark provider
+(historically Muse Spark Open via Baseten; newer native Muse Spark 1.3
+support has no new paid evaluation in this repository) ->
+interpretation -> validated test plan -> explicit approval ->
+deterministic buggy/corrected execution -> reproducible evidence.
+
+Native Muse Spark 1.3 support was added later for live configuration
+only. Do not present historical Muse Spark Open results as Muse Spark
+1.3 results, and do not invent new live evaluation results.
 
 ## 2. Supported Rule Vocabulary (Exact)
 
@@ -71,7 +86,7 @@ Distinctions:
 - For ambiguous/unsupported: valid executable plan is semantic failure (hallucination). No execution unless independently established as supported.
 
 Execution integrity:
-- Only validationResult.ok && actualClassification===supported plans are executed with explicit approvalHash token.
+- Only validationResult.ok && actualClassification===supported plans are executed with an explicit server-issued authorization token after approval.
 - No dynamically generated JavaScript; executor is fixed switch over allowlisted ops.
 - Seeded defect (buggy checks only amountCents > capturedCents) is never disclosed to model.
 
@@ -99,7 +114,13 @@ cd C:\Repo\proofcase-meta-hackathon
 node --env-file=.env.local scripts/evaluate.mjs --live
 node --env-file=.env.local scripts/evaluate.mjs --live --verbose
 ```
-Before first call prints MAXIMUM POSSIBLE PAID REQUESTS. Requires BASETEN_API_KEY in .env.local (never commit). Evaluator aborts if cap exceeded. Cost notice: at most 2 per case, worst-case 20.
+Before first call prints MAXIMUM POSSIBLE PAID REQUESTS. Live mode uses
+the selected provider key: `MODEL_API_KEY` for the default native Meta
+provider, or `BASETEN_API_KEY` with `MODEL_PROVIDER=BASETEN` for legacy
+Baseten live runs (never commit either). Evaluator aborts if cap
+exceeded. Cost notice: at most 2 per case, worst-case 20. No new paid
+live evaluation was run for native Muse Spark 1.3 during M1/M1.1; the
+archived paid results below remain historical Muse Spark Open evidence.
 
 Demo server:
 ```powershell
@@ -178,7 +199,11 @@ Post-fix sprint 3.1 re-evaluation with gate and retry not yet live; dry-run mock
 
 **Retry findings:** Previous 4096 budget truncated 2 supported; fix confirms retry detection via isConfirmedTruncation and isBudgetExhausted, caps at 2 attempts, retry budget roughly 2x initial (max 16384). No infinite loops.
 
-**Verification:** Run targeted tests only (node --test test/sprint3.1.test.js etc). Optional live: BASETEN_API_KEY required, node scripts/evaluate.mjs --live (archived, opt-in).
+**Verification:** Run the supported guarded command only (`npm test`).
+Targeted unguarded Node test invocations may bypass the
+application-level offline guard. Optional live run requires the key for
+the selected provider; no live calls were made during the M1/M1.1
+migration and default evaluation stays offline.
 
 ## 9. Known Limitations
 

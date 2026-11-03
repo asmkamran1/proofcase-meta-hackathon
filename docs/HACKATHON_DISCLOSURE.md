@@ -5,40 +5,46 @@
 Meta Global AI Developer Hackathon 2026 -- Indie Developer Track.
 Problem statement: Build for Your World.
 Team: solo indie developer.
-Project: ProofCase -- Refund Invariant Demo with Meta Muse Spark.
-New live inference: Meta Model API, Muse Spark 1.3 (`muse-spark-1.3`).
+Project: ProofCase -- AI-Powered Refund Rule Testing with Meta Muse Spark.
+Current live inference: Meta Model API, Muse Spark 1.3 (`muse-spark-1.3`).
 Historical evidence: Muse Spark Open via Baseten
-(`meta-models/muse-spark-open-1026`). No new paid evaluations were
-performed during M1 migration; demo may run entirely offline in recorded mode.
+(`meta-models/muse-spark-open-1026`). No new paid live evaluations were
+performed during the M1/M1.1 native Meta migration; the demo may run
+entirely in offline recorded mode.
 Window: October 26 -- November 4, 2026.
 
 ## Provenance
 
 - `src/metaClient.js` was adapted from the companion Form Intelligence
   prototype at `C:\Repo\workcadence-meta-hackathon\src\metaClient.js`,
-  the Baseten Muse Spark Open client created fresh during the same
-  hackathon window for the same model. It provides the generic HTTPS
-  transport, budget/retry contract (4096 default, 8192 retry, 16384 max,
-  2 attempts), truncation detection, and _diag plumbing. No private
-  pre-hackathon Work Cadence product code was imported. Header in the
-  file preserves provenance.
+  the generic Muse Spark HTTPS client created fresh during the same
+  hackathon window. It provides the generic transport, budget/retry
+  contract (4096 default, 8192 retry, 16384 max, 2 attempts), truncation
+  detection, and _diag plumbing. Native Meta provider support
+  (`MODEL_PROVIDER=META`, `muse-spark-1.3`) was added for ProofCase during
+  the M1/M1.1 migration; it did not generate the original recorded
+  response. No private pre-hackathon Work Cadence product code was
+  imported. Header in the file preserves provenance.
 
 - All other files in this repository are newly created for ProofCase
   inside the Oct 26 -- Nov 4 window. See NEW_WORK.md for the full table.
 
 - ProofCase and the companion Work Cadence/ Form Intelligence project are
   distinct hackathon prototypes by the same author, built in parallel,
-  targeting different problems. The only shared artifact is the low-level
-  transport in metaClient.js.
+  targeting different problems. The only shared artifact is the generic
+  transport, budget/retry contract, and diagnostics in metaClient.js.
+  The native Meta provider configuration was added for ProofCase.
 
 ## Scope
 
 One bounded QA demonstration for the refund-cap invariant:
 sum(accepted refunds per order) <= capturedCents. The seeded defect is
 fictional (buggy variant checks per-refund only; corrected checks
-cumulative). Sprint 1 proved the core loop works with a real model;
-Sprint 2 added browser approval and recorded replay; Sprint 3 added
-10-case evaluation; Sprint 3.1 added safety gating and corrected metrics.
+cumulative). Sprint 1 proved the core loop works with a real Muse Spark
+Open model via Baseten; no new paid Muse Spark 1.3 evaluation was run
+during the later native Meta migration. Sprint 2 added browser approval
+and recorded replay; Sprint 3 added 10-case evaluation; Sprint 3.1 added
+safety gating and corrected metrics.
 
 No UI redesign, no new models, no Playwright, no production integrations
 in Sprint 4 -- documentation, audit, and submission readiness only.

@@ -13,7 +13,7 @@ unless noted as reused under disclosure.
 ## Summary
 
 ProofCase is a narrow demo that a natural-language refund rule can be
-turned by Meta Muse Spark Open into a validated, human-approved,
+turned by Meta Muse Spark into a validated, human-approved,
 deterministically executable test sequence exposing a seeded cumulative-
 refund defect in a fictional service. It adds a bounded invariant,
 controlled vocabulary, fail-closed validation, side-by-side executor
@@ -25,13 +25,15 @@ seeded and fictional.
 
 ## Reused Code (Disclosed)
 
-- `src/metaClient.js` — Baseten transport + budget/retry contract copied
-  verbatim from the companion Form Intelligence prototype at
+- `src/metaClient.js` — Generic HTTPS transport plus budget/retry
+  contract copied from the companion Form Intelligence prototype at
   `C:\Repo\workcadence-meta-hackathon\src\metaClient.js`, built in the same
-  window for the same Muse Spark model. Only the generic HTTPS client,
+  window for a Meta Muse Spark model. Only the generic transport,
   budget caps, truncation detection, and diagnostics are shared. No product
-  logic reused. Header in file preserves provenance. See
-  `docs/HACKATHON_DISCLOSURE.md`.
+  logic reused. The current native Meta provider support
+  (`MODEL_PROVIDER=META`, `muse-spark-1.3`) was added for ProofCase during
+  the M1/M1.1 migration; the historical recorded response remains
+  Muse Spark Open via Baseten. See `docs/HACKATHON_DISCLOSURE.md`.
 
 ## New Files for ProofCase
 
@@ -71,13 +73,17 @@ seeded and fictional.
   (exact vs safe-abstention vs providerError), archive of prior live.
 - `scripts/runFeasibility.js` — (Sprint 1) Feasibility runner: real Meta
   call -> validate -> approve -> dual execution -> docs/MODEL_RUN.md.
-- `test/` (12 files) — validator, planner, refundService, executor,
+- `test/` (15 files, `npm test` with offline guard preloaded) — validator, planner, refundService, executor,
   sprint2, evaluation, sprint3.1, timeline, plus H1/H2/H3 hardening:
   http-security (16), approval-security (18), recorded-gate (16),
-  hardening-regression (5). Full suite: 111/111 pass at H3 close.
-- `docs/MODEL_RUN.md` — verbatim model output + dual execution evidence.
-- `docs/recordedResponse.json` — 7-op Muse Spark plan + _diag captured
-  2026-10-29, served as reproducible recorded replay.
+  hardening-regression (5), plus M1/M1.1 provider coverage:
+  meta-provider (26), provider-config (10), offline-guard (4).
+  Verified local result November 3, 2026: 151/151 pass. Earlier H3
+  baseline was 111/111. Historical counts are preserved in prior reports.
+- `docs/MODEL_RUN.md` — verbatim model output plus dual execution evidence
+  (historical Muse Spark Open via Baseten, 2026-10-29).
+- `docs/recordedResponse.json` — 7-operation historical Muse Spark Open
+  plan via Baseten, captured 2026-10-29, served as reproducible recorded replay.
 - `docs/EVALUATION.md` — methodology, vocabulary, dataset, metrics,
   retry findings, limitations.
 - `docs/ARCHITECTURE.md` — flow, components, and safety.
@@ -93,9 +99,11 @@ seeded and fictional.
 Work Cadence / Form Intelligence at `C:\Repo\workcadence-meta-hackathon`
 is a parallel hackathon entry by the same author, built in the same
 window for a different problem (applicant form interpretation, ATS
-routing). The only shared artifact is the low-level Baseten transport.
+routing). The only shared artifact is the generic low-level HTTPS
+transport, budget/retry contract, and diagnostics in metaClient.js.
 ProofCase's requirement, catalog, validator, refund service, executor,
-gate, approval, evaluation dataset, and UI are all disjoint.
+gate, approval, evaluation dataset, UI, and native Meta provider
+configuration are all distinct.
 
 ## No Private Commercial Code
 

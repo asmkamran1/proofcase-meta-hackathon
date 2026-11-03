@@ -1,4 +1,10 @@
-# Security and Publication Audit -- Sprint 4 (2026-11-01)
+# Security and Publication Audit -- Sprint 4 (2026-11-01) with D1 documentation-consistency update
+
+> D1 scope note: this is a documentation-only cleanup following the
+> M1/M1.1 native Meta migration. No code, tests, or package behavior
+> were changed in D1. Historical audit dates, counts, and findings below
+> are preserved; D1 adds explicit resolved-versus-open separation and
+> corrects provider references without rewriting immutable evidence.
 
 > Task A -- Repository Audit findings for the standalone
 > `C:\Repo\proofcase-meta-hackathon` submission. No private Work Cadence
@@ -16,11 +22,15 @@
   dashboard, remove the old key from `.env.local`, and re-create the file
   locally only from `.env.example` on contributor machines. Never commit,
   print, or paste the key. The audit does not reproduce the full value.
+  Rotate through the dashboard for the affected provider.
 - **Verification:** `Select-String -Pattern b10_` over `docs/*`, `src/*`,
   `public/*`, `fixtures/*` returned no matches -- no key leaked into
   generated reports, fixtures, or code.
 - **`.env.example` is clean:** contains empty `MODEL_API_KEY=` plus
-  commented Baseten legacy values; safe to publish.
+  commented Baseten legacy values; safe to publish. The current contract
+  is `MODEL_PROVIDER=META`, `MODEL_API_KEY`, `META_MODEL=muse-spark-1.3`,
+  and `META_BASE_URL=https://api.meta.ai/v1`; use placeholders only.
+  Previously exported PowerShell variables take precedence over the file.
 - **Provider hints truncated:** `metaClient.js` and `planner.js` truncate
   provider error messages to 200 chars on 4xx/5xx and never include the
   key or prompt.
@@ -42,8 +52,8 @@
   file: `if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }`.
 - `src/server.js:loadEnv()` and `scripts/runFeasibility.js:loadEnv()`
   both read `.env.local` then `.env` with `if (!(k in process.env))` --
-  env already set externally takes precedence. Correct for Baseten key
-  injection in hosted demos.
+  env already set externally takes precedence. This applies to the key
+  for whichever provider is selected, including hosted demos.
 - `scripts/evaluate.mjs` relies on `process.env` only; it does not load
   `.env.local` itself -- live mode requires external env setup. Documented
   in `docs/EVALUATION.md` and `docs/VERIFICATION.md`.
@@ -91,7 +101,9 @@
 
 - Zero production npm dependencies; `engines: node >=20` only.
 - Node built-ins (`node:http`, `fs`, `path`, `url`, `crypto`, `test`) are MIT.
-- Model via Baseten: no weights bundled; attribution in THIRD_PARTY_NOTICES.md.
+- Model via the selected provider (current default native Meta Model
+  API; historical Baseten inference): no weights bundled; attribution
+  in THIRD_PARTY_NOTICES.md.
 - `THIRD_PARTY_NOTICES.md` (new Sprint 4) and `LICENSE` (MIT) added.
 
 ## 9. New-Work Provenance
@@ -102,18 +114,22 @@
 - Evaluation fixtures `fixtures/evaluation.json` carry `createdAt` and
   `disclaimer: Ten synthetic cases are NOT a general benchmark`.
 
-## 10. Remaining Actions Before Publication
+## 10. Remaining Actions Before Publication (historical Sprint 4 checklist; repository is already initialized)
 
-1. **Rotate the Baseten API key** (critical) and delete the old value from
-   disk; new value only in local `.env.local`.
-2. `git init` in `proofcase-meta-hackathon` (it is not yet a git repo;
-   `C:\Repo` is not a git repo either) -- see `docs/PUBLICATION.md`.
+1. **Rotate any exposed API key** for the affected provider (critical)
+   and delete the old value from disk; new value only in local
+   `.env.local`, never committed.
+2. Confirm `git status --short` shows only intended documentation
+   changes and `.env.local` remains ignored; see `docs/PUBLICATION.md`
+   for manual review steps. Do not run `git init` again, replace the
+   remote, force-push, rewrite history, or overwrite `.env.local`.
 3. `git add` only tracked sources; verify `git status` does not list
    `.env.local`.
-4. Push to a new public GitHub repo; confirm no secrets via GitHub secret
-   scanning after push.
-5. Publish unlisted YouTube demo video with required labels; add link to
-   submission form.
+4. Push to the existing public GitHub repo
+   `https://github.com/asmkamran1/proofcase-meta-hackathon`; confirm no
+   secrets via GitHub secret scanning after push.
+5. Publish unlisted YouTube demo video with required labels; add the
+   real link to the submission form. Do not invent a video URL.
 
 ## 11. Audit Command Used
 
@@ -143,7 +159,10 @@ H1 implements fail-closed hardening for the local-only server (`src/server.js`) 
 
 **Remaining local-process limitation:** same-machine processes can still reach `127.0.0.1:8080`; origin/host checks do not authenticate arbitrary local processes.
 
-**Verification:** `node --check src/server.js` and `node --test test/http-security.test.js` (16/16 pass) plus targeted `validator/sprint2/executor/timeline` (27/27 pass).
+**Verification:** `node --check src/server.js` and the supported guarded
+`npm test` command (historical H1 note also referenced targeted
+`node --test` file invocations for `http-security`, `validator`,
+`sprint2`, `executor`, and `timeline`).
 
 ## 13. H3 Audit Evidence (2026-11-02)
 
@@ -165,7 +184,11 @@ H1 and H2 were verified against actual code and live test runs:
   client-forged provenance/model fields cannot affect the report;
   HTTP inputs cannot inject the model factory.
 - Full suite at H3 close: 111/111 pass, 0 fail, 0 skipped,
-  0 cancelled.
+  0 cancelled. This historical H3 baseline is preserved. The later
+  M1/M1.1 provider and offline-guard additions brought the verified
+  local total to 151/151 on November 3, 2026 (111 + 36 provider tests +
+  4 offline-guard tests). These are software-regression tests, not
+  successful AI-generated plans, and no CI execution is claimed.
 - Test-count reconciliation: the prior H2 report mixed file
   subtotals (18+16+16+59=109 vs stated 93 targeted/106 full).
   Actual per-file counts: approval-security 18, evaluation 10,
@@ -176,7 +199,36 @@ H1 and H2 were verified against actual code and live test runs:
 - Secret-scan note: the `b10_` prefix appears in this file and
   VERIFICATION/PUBLICATION only as a scan pattern and disclosure
   note -- no full key is stored in any tracked file. `.env.local`
-  exists on disk (untracked, gitignored) and must be rotated
-  before publication.
+  exists on disk (untracked, gitignored) and any exposed value must be
+  rotated before publication.
+
+## 14. D1 Resolved Versus Open Security Findings
+
+Resolved and verified in code and tests:
+
+- IPv4 loopback-only binding (`127.0.0.1`, no public bind or host override).
+- Host validation and Origin checks for browser POST requests.
+- No wildcard CORS.
+- 64-KiB JSON request-body limit.
+- Bounded live-inference rate limiting before paid inference.
+- Structural plan validation plus semantic eligibility screening.
+- HMAC-SHA256 execution authorization bound to requirement, normalized
+  plan, and provenance, with a 15-minute TTL and per-instance signing key.
+- Server-controlled report provenance.
+- Recorded replay without paid inference.
+
+Limitations that remain open:
+
+- Loopback-only access is not user authentication; same-machine
+  processes may still reach the local server.
+- Rate limiting is not a durable spending cap.
+- Semantic eligibility uses bounded heuristics, not formal proof.
+- Browser automation coverage is incomplete.
+- HMAC authorization does not prove human identity.
+- Offline test guards do not provide OS-level network isolation.
+- Upstream timeout does not necessarily bound response-body consumption.
+- Raw provider errors may still be reflected after truncation.
+- Remaining engineering findings have not been claimed as fixed.
+- This application is not approved as a public multi-user production service.
 
 

@@ -28,7 +28,9 @@ ProofCase turns one refund invariant into a validated, human-approved,
 executable test sequence exposing a seeded defect.
 
 Input: one sentence + bounded catalog (4 ops, 8 steps, cents bounds) sent
-to Muse Spark Open via Baseten. Output: STRICT JSON with interpretedRule
+to the selected Meta Muse Spark provider (current default: native Meta
+Model API with `muse-spark-1.3`; recorded and archived evidence used
+historical Muse Spark Open via Baseten). Output: STRICT JSON with interpretedRule
 and 7-step ops. The app validates structurally, checks the bounded
 4-pillar semantic gate (cumulative, accepted, per-order, captured;
 reversed/strict/equality/vague-cap rejected) and plan shape, requires
@@ -44,15 +46,18 @@ evaluation; Sprint 3.1 added safety gating, bounded retry, corrected
 metrics (exact vs safe-abstention vs providerError) with archived history.
 Defects are seeded fictional.
 
-New work Oct 26 -- Nov 4; only Baseten transport adapted from companion
-prototype (disclosed).
+New work Oct 26 -- Nov 4; only the generic transport, budget/retry
+contract, and diagnostics were adapted from the companion prototype
+(disclosed). The native Meta provider did not generate the original
+recorded response.
 
 ## Public GitHub Repository
 
 https://github.com/asmkamran1/proofcase-meta-hackathon
 
 Standalone, MIT, zero prod dependencies, live + recorded documented.
-H1/H2/H3 review changes are local until pushed via docs/PUBLICATION.md.
+Local review changes are manual user actions and are pushed only through
+explicit user commands; this project has not been submitted yet.
 
 ## Three-Minute Demo Video
 
@@ -67,17 +72,25 @@ to YouTube.
 
 ## Meta Products Used
 
-- Meta Muse Spark Open -- meta-models/muse-spark-open-1026 (all plan
-  generation via Baseten provider).
-- Baseten Inference Platform as provider (server-side HTTPS only).
+- Meta Muse Spark 1.3 (`muse-spark-1.3`) via the native Meta Model API
+  as the current default live provider (no new paid evaluation was run
+  for this provider during M1/M1.1).
+- Historical Meta Muse Spark Open (`meta-models/muse-spark-open-1026`)
+  via Baseten for all recorded and archived live plan generation.
+- Baseten Inference Platform as the legacy provider (server-side HTTPS only).
 
 No other Meta products.
+
+This submission does not claim Meta certified or approved the final
+submission.
 
 ## Why Meta Models Matter
 
 Without Muse Spark, ProofCase has no generation -- interpretedRule and
 exceed-cap scenario (create $100, accept $40, reject $70) are model
-outputs, not templates. Model preserves cumulative invariant across
+outputs within an explicitly bounded prompt, not templates. The prompt
+requests a cumulative exceed-cap scenario, so the model did not
+independently discover an unknown defect. Model preserves cumulative invariant across
 paraphrases and selects only allowlisted ops. Reasoning/truncation is
 handled via bounded retry; _diag preserved for audit.
 
@@ -100,8 +113,8 @@ Muse Spark-class models in docs.
 ## Checklist Before Submitting
 
 - [ ] Video link pasted above (unlisted YouTube); repo link verified live.
-- [ ] H1/H2/H3 local changes reviewed, committed, and pushed (no force-push).
-- [ ] Label recordedResponse.json matches video caption.
-- [ ] Label recordedResponse.json matches video caption.
+- [ ] Local changes reviewed, committed, and pushed manually (no force-push, no history rewrite).
+- [ ] Recorded response label matches video caption (historical Muse Spark Open via Baseten).
 - [ ] Re-run docs/VERIFICATION.md checklist.
 - [ ] Do not commit .env.local; .gitignore covers it.
+- [ ] Do not claim the project has already been submitted until the form is actually filed.

@@ -2,6 +2,7 @@
 
 > Run only targeted checks; do not push or submit automatically.
 > All commands assume PowerShell from C:\Repo\proofcase-meta-hackathon.
+> Documentation changes only: no code, test, package, secret, or recorded-evidence edits.
 
 ## 0. Location and Node
 
@@ -19,10 +20,13 @@ npm test
 # Command enumerates every test file with the guard preloaded:
 # node --import ./test/helpers/offline-guard.js --test <15 files>
 # (explicit file list because PowerShell does not expand test/*.test.js
-# and bare `test/` also picked up the helper as a phantom 152nd entry).
+# and bare `test/` also picked up the helper as a phantom entry).
 # The --import preloads test/helpers/offline-guard.js, which throws
 # OFFLINE_GUARD_BLOCKED on any non-loopback fetch/http/dns provider call
-# while allowing 127.0.0.1 loopback test servers.
+# while allowing 127.0.0.1 loopback test servers. This is
+# application-level protection, not an OS-level network sandbox.
+# Manually running alternate Node test commands without the guard may
+# bypass that protection.
 # Breakdown: approval-security 18, evaluation 10, executor 4,
 # hardening-regression (H3) 5, http-security 16, meta-provider 26,
 # offline-guard 4, planner 3, provider-config 10, recorded-gate 16,
@@ -34,6 +38,8 @@ npm test
 # 10x200 + recorded replay + 1x429 with mock-call accounting.
 # Suite completes in ~1s offline; any live provider call throws
 # OFFLINE_GUARD_BLOCKED and fails instead of spending credits.
+# These 151 tests are software-regression evidence, not 151 successful
+# AI-generated plans. No CI execution is claimed.
 ```
 
 ## 2. Syntax and Package Checks
@@ -45,7 +51,7 @@ Get-ChildItem src\*.js,scripts\*.mjs | ForEach-Object { node --check $_.FullName
 # package sanity
 Get-Content package.json | ConvertFrom-Json | Format-List
 npm list 2>&1       # expect empty (zero prod dependencies)
-npm run test 2>&1   # alias for node --test test/
+npm test 2>&1       # guarded command; do NOT use bare node --test test/ as the normal command
 ```
 
 ## 3. Clean Install
@@ -89,10 +95,10 @@ Select-String -Path .env.local -Pattern "BASETEN_API_KEY" -ErrorAction SilentlyC
 ## 6. Local Application Startup
 
 ```powershell
-# Requires .env.local with BASETEN_API_KEY for live; recorded needs no key.
+# Recorded replay needs no key. Live mode needs the key for the selected provider.
 # Create .env.local ONLY if absent; never overwrite it:
 if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
-# set BASETEN_API_KEY in .env.local if testing live (never print it)
+# set MODEL_API_KEY for META default, or BASETEN_API_KEY with MODEL_PROVIDER=BASETEN for legacy Baseten (never print it)
 
 node --env-file=.env.local src/server.js
 # open another terminal:
@@ -114,10 +120,10 @@ node -e "import fs from 'node:fs'; import {validateTestPlan,normalizePlan} from 
 ```powershell
 # Paid; capped 20 requests; requires selected provider key
 # (MODEL_API_KEY for META default; BASETEN_API_KEY with MODEL_PROVIDER=BASETEN)
-# No live calls were made during M1 migration; default evaluation stays offline.
-node scripts/runFeasibility.js            # single canonical requirement, writes docs/MODEL_RUN.md
-node scripts/evaluate.mjs --live          # 10-case suite, archives prior live to docs/archive/
-node scripts/evaluate.mjs --live --verbose
+# No live calls were made during the M1/M1.1 migration; default evaluation stays offline.
+node --env-file=.env.local scripts/runFeasibility.js  # single canonical requirement; paid live run (writes docs/MODEL_RUN.md only when run)
+node --env-file=.env.local scripts/evaluate.mjs --live  # 10-case suite, archives prior live to docs/archive/
+node --env-file=.env.local scripts/evaluate.mjs --live --verbose
 # Inspect result:
 Get-Content docs\evaluation-report.json -Head 80
 Get-Content docs\evaluation-report.md.fragment
@@ -125,6 +131,6 @@ Get-Content docs\evaluation-report.md.fragment
 
 ## 9. Publication (manual only)
 
-See docs/PUBLICATION.md for git init, secret re-scan, add/commit, remote,
+See docs/PUBLICATION.md for secret re-scan and manual add/commit, without git init/remote replacement,
 push, and tag steps. Do not run push commands unless you have completed
 secret rotation and local verification above.

@@ -1,4 +1,4 @@
-# ProofCase -- Refund Invariant Demo with Meta Muse Spark Open
+# ProofCase -- AI-Powered Refund Rule Testing with Meta Muse Spark
 
 > Meta Global AI Developer Hackathon 2026 -- Indie Developer Submission
 > Synthetic seeded defects are not discoveries in production software.
@@ -12,53 +12,127 @@ trust when a model is involved.
 
 ## 2. What ProofCase Does
 
+ProofCase tests one plain-English refund rule with help from Meta Muse Spark.
+
 Given one refund rule, ProofCase:
 
-1. Sends only requirement + bounded catalog to Muse Spark 1.3 via the
-   native Meta Model API (`muse-spark-1.3`), or to Muse Spark Open via
-   Baseten (`meta-models/muse-spark-open-1026`) when `MODEL_PROVIDER=BASETEN`.
-2. Receives STRICT JSON: version, ruleId, businessRequirement,
-   interpretedRule, operations (allowlisted, max 8).
-3. Validates structurally and semantically (4-pillar gate: cumulative,
-   accepted, per-order, captured; plan must demonstrate exceed-cap).
-4. Requires explicit human approval (hash-bound token).
-5. Executes deterministically on buggy vs corrected in-memory fixtures.
-6. Renders side-by-side results and downloadable JSON report.
+1. Accepts a plain-English refund rule for a single invariant: total accepted refunds cannot exceed captured payment.
+2. Sends only the requirement plus a bounded operation catalog to the selected Meta Muse Spark provider.
+3. Receives a proposed bounded test sequence as STRICT JSON (max 8 allowlisted operations).
+4. Validates the plan structurally and checks semantic eligibility before anything can run.
+5. Requires an explicit Approve & Run action in the UI plus a server-issued authorization token before execution.
+6. Runs the approved plan deterministically against simulated buggy and corrected refund services, then shows side-by-side results with a downloadable JSON report.
 
-## 3. Why Meta Muse Spark Open Matters
+The refund defect is intentionally seeded for demonstration. The buggy
+simulated service checks only each single refund, while the corrected
+service checks the cumulative total. This demo does not claim discovery
+of a real production payment defect, and it does not support arbitrary
+business rules outside the single refund-cap invariant.
 
-The test-plan translation including interpretedRule paraphrase is
-produced by Muse Spark Open. No template or fallback exists. The model
-preserves cumulative business semantics and proposes a scenario that
-collectively exceeds the cap across two refunds. Truncation is handled
-with bounded retry (4096 default, capped 16384, max 2 attempts).
+## 3. What Meta Muse Spark Contributes
+
+The model proposes the test plan within an intentionally bounded
+specification. There is no template or fallback plan: the
+`interpretedRule` paraphrase and the exceed-cap scenario come from the
+model, but the planner prompt explicitly requests a cumulative
+refund-cap violation scenario using only the predefined operations.
+The model does not execute code and did not independently discover an
+unknown defect.
+
+Two inference configurations are supported:
+
+- META (current default): native Meta Model API,
+  default model `muse-spark-1.3`, key `MODEL_API_KEY`,
+  base URL `https://api.meta.ai/v1`.
+- BASETEN (legacy support): Baseten inference,
+  historical model `meta-models/muse-spark-open-1026`,
+  key `BASETEN_API_KEY`,
+  base URL `https://inference.baseten.co/v1`.
+
+Changing the provider selects where new live inference runs. It does
+not change historical evaluation results.
+
+Historical evidence: the recorded response in
+`docs/recordedResponse.json` was generated using Muse Spark Open
+through Baseten on 2026-10-29. The current live default may use Muse
+Spark 1.3, but that recorded output retains its original model
+identity. This repository does not claim a verified live Muse Spark
+1.3 demonstration beyond what is recorded in code and tests.
+
+Truncation is handled with bounded retry (4096 default, capped 16384,
+max 2 attempts).
 
 ## 4. Installation and Execution
 
 Requires Node 20+.
 
+The normal supported test command is:
+
+```powershell
+npm test
+```
+
+It preloads `test/helpers/offline-guard.js` and explicitly enumerates
+the 15 test files listed in `package.json`. Do not use unguarded
+`node --test test/` as the normal regression command: it bypasses the
+application-level network protection and can pick up the helper as an
+extra entry. New test files must be added to the `npm test` command
+until automatic guarded discovery is implemented.
+
+Current verified result (local run, November 3, 2026): 151 tests,
+151 passed, 0 failed, 0 skipped, 0 cancelled. These are
+software-regression tests, not 151 successful AI-generated plans, and
+no CI execution is claimed here.
+
+### Provider configuration
+
+The intended native Meta configuration is:
+
+```powershell
+MODEL_PROVIDER=META
+MODEL_API_KEY=<your-key>
+META_MODEL=muse-spark-1.3
+META_BASE_URL=https://api.meta.ai/v1
+```
+
+Use placeholders only. Never paste a real key, partial key, or
+sample credential that resembles a production secret.
+
+Setup rules:
+
+- `.env.local` must never be committed (it is gitignored).
+- Create `.env.local` only if absent; never overwrite an existing file:
+
+```powershell
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
+```
+
+- Previously exported PowerShell environment variables take precedence
+  over values loaded from the file, so unset stale exports first.
+- Replacing the API key alone does not switch providers; the provider
+  is selected by `MODEL_PROVIDER`.
+- Recorded replay works without any API key. Live inference requires
+  credentials for the selected provider plus available provider capacity.
+- For legacy Baseten live runs only, set `MODEL_PROVIDER=BASETEN` with
+  `BASETEN_API_KEY` and the Baseten base URL and model from
+  `.env.example`.
+
+### Run the app and evaluation
+
 ```powershell
 cd C:\Repo\proofcase-meta-hackathon
 npm install   # zero prod dependencies; verifies package manifest only
-# Create .env.local ONLY if absent; never overwrite an existing file:
-if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
-# set MODEL_API_KEY in .env.local for META live (never commit it; never print it)
-# or set BASETEN_API_KEY with MODEL_PROVIDER=BASETEN for legacy Baseten live
-
-# tests (no API key needed)
-node --test test/
 
 # app (recorded replay needs no key; live inference needs selected provider key)
 node --env-file=.env.local src/server.js
 # open http://localhost:8080
 
-
-# feasibility gate (real inference)
-node scripts/runFeasibility.js
+# feasibility gate (real inference, paid, requires selected provider key)
+node --env-file=.env.local scripts/runFeasibility.js
 
 # evaluation
 node scripts/evaluate.mjs              # dry-run mock (offline)
-node scripts/evaluate.mjs --live       # real inference (capped 20)
+node --env-file=.env.local scripts/evaluate.mjs --live       # real inference (capped 20)
 ```
 
 ## 5. Live Inference vs Recorded Replay
@@ -90,12 +164,21 @@ Max 8 ops, IDs ^[A-Za-z0-9_-]{1,32}$.
 
 ## 8. Human Approval and Safety
 
+Execution requires an explicit approval action in the UI and a
+server-issued HMAC-SHA256 authorization token.
+
 - Authorization: server-issued HMAC token (per-instance random 32-byte key,
-  15-minute TTL, constant-time signature check). Binds canonical
-  requirement hash + normalized plan hash + provenance + modelId.
-  Legacy unsigned SHA-256 hashes cannot authorize `/api/run`.
+  15-minute TTL, constant-time signature check). Tokens bind the
+  requirement, the normalized plan, and provenance. Signing keys are
+  generated per server instance. Tokens do not authenticate human
+  identity. Legacy unsigned hashes cannot authorize `/api/run`.
   This is server-issued execution authorization, not human identity
-  authentication.
+  authentication, and it does not prove a specific person approved the plan.
+- Token order: the server issues the token after validation and the
+  semantic gate pass; the browser's Approve & Run click then submits it.
+  The server validates the token when the user requests execution.
+  The browser click is not cryptographically authenticated as an
+  identity assertion.
 - Explicit human step: UI requires Approve & Run click; `doInterpret`
   never calls `/api/run`. Requirement edits invalidate approval;
   stale/overlapping interpretation responses are discarded via
@@ -121,11 +204,16 @@ docs/evaluation-report.json. Recorded references:
 - docs/archive/ holds preserved history; docs/human-review.md log.
 
 Limitations: 10 cases are not a general benchmark; semantic review is
-manual; gate is narrow to refund-cap.
+manual; gate is narrow to refund-cap and uses bounded heuristics, not
+formal proof. The repository's 151 passing software tests are
+regression evidence, not a benchmark of 151 successful AI-generated
+plans.
 
 ## 10. What Was Built Oct 26 - Nov 4
 
-Sprint 1: Feasibility gate with real Muse Spark plan (docs/MODEL_RUN.md).
+Sprint 1: Feasibility gate with a real Muse Spark Open plan via Baseten
+(docs/MODEL_RUN.md; no new paid Muse Spark 1.3 evaluation was run
+during the later native Meta migration).
 Sprint 2: Browser demo with approval, side-by-side, JSON export, recorded.
 Sprint 3: 10-case evaluation with real inference.
 Sprint 3.1: Safety correction, bounded retries, corrected metrics, archive.
@@ -137,8 +225,9 @@ See NEW_WORK.md, docs/HACKATHON_DISCLOSURE.md, docs/SPRINT3.1-REPORT.md.
 
 src/metaClient.js adapted from the in-window Form Intelligence prototype
 at C:\Repo\workcadence-meta-hackathon\src\metaClient.js (same author,
-same model, same Oct 26-Nov 4 window). Only generic Baseten transport
-shared. See NEW_WORK.md and docs/HACKATHON_DISCLOSURE.md.
+same Oct 26-Nov 4 window). Only the generic HTTPS transport, budget
+and retry contract, and diagnostics are shared; no product logic was
+reused. See NEW_WORK.md and docs/HACKATHON_DISCLOSURE.md.
 
 ## 12. Known Limitations and Future Work
 
@@ -149,7 +238,12 @@ additional vocabularies, stricter theorem checks, cost tracing.
 ## 13. Security
 
 Never commit .env.local (see .gitignore). Rotate any exposed key via
-Baseten dashboard. See docs/SECURITY_AUDIT.md for audit findings.
+the dashboard for the affected provider. The offline test guard is
+application-level network protection activated by `npm test`; it is
+not an OS-level network sandbox. See docs/SECURITY_AUDIT.md for
+resolved versus open findings; remaining engineering findings are
+still open and this app is not approved as a public multi-user
+production service.
 
 ## License
 

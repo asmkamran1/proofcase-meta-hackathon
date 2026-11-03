@@ -23,12 +23,13 @@ Defect is intentionally seeded and fictional.
   and plan exceed-cap shape. Hardened fail-closed: reversed exceed,
   strict less-than, equality, and vague cap language rejected.
   Returns VALID vs NEEDS_INPUT/UNSUPPORTED.
-- approval.js -- server-issued HMAC execution authorization
+- approval.js -- server-issued HMAC-SHA256 execution authorization
   (per-instance random 32-byte key, 15-minute TTL, constant-time
-  signature and digest comparison). Binds canonical requirement hash
-  plus normalized plan hash plus provenance plus modelId. Legacy
-  unsigned SHA-256 hashes cannot authorize /api/run. Authorization
-  is not human identity authentication.
+  signature and digest comparison). Binds the requirement plus the
+  normalized plan plus provenance plus modelId. Legacy unsigned
+  hashes cannot authorize /api/run. Authorization is not human
+  identity authentication and does not prove a specific person
+  approved the plan.
 - refundService.js -- in-memory fictional service. Buggy: per-refund
   check only. Corrected: cumulative check. No DB.
 - executor.js -- fixed deterministic switch on allowlisted ops;
@@ -49,14 +50,30 @@ Defect is intentionally seeded and fictional.
 
 ## 3. Flow
 
-1. Requirement + catalog -> Muse Spark 1.3 via native Meta Model API by default (Muse Spark Open via Baseten when MODEL_PROVIDER=BASETEN; or recordedResponse.json)
+Business Requirement
+-> Selected Meta Model Provider
+-> AI-Generated Test Plan
+-> Structural Validation
+-> Semantic Eligibility Gate
+-> Server-Issued Authorization
+-> Explicit User Approval
+-> Deterministic Execution
+-> Buggy/Corrected Comparison
+-> JSON Report
+
+1. Requirement + catalog -> selected Meta Muse Spark provider by default (native Meta Model API, `muse-spark-1.3`; Muse Spark Open via Baseten only when `MODEL_PROVIDER=BASETEN`; or recordedResponse.json)
 2. normalize + validate (structural: version, ruleId, 2..8 ops, allowlist + bounds + refs)
 3. semantic gate (bounded keyword eligibility: cumulative + accepted + per-order + captured; reversed/strict/equality/vague-cap fail-closed; plus interpretedRule + plan exceed-cap shape)
-4. server-issued HMAC execution authorization (per-instance key, 15-min TTL; binds canonical requirement + normalized plan + provenance + modelId)
-5. explicit human click Approve & Run (UI never auto-runs; edits invalidate approval; stale/overlapping responses discarded)
-6. /api/run re-validates, re-gates, verifies HMAC (fail-closed 400; legacy unsigned hashes rejected)
+4. server-issued HMAC-SHA256 execution authorization (per-instance key, 15-min TTL; binds requirement + normalized plan + provenance + modelId)
+5. explicit human click Approve & Run submits that authorization (UI never auto-runs; edits invalidate approval; stale/overlapping responses discarded)
+6. on execution request, /api/run re-validates, re-gates, verifies HMAC (fail-closed 400; legacy unsigned hashes rejected)
 7. executePlan buggy + correct (deterministic, allowlisted ops only)
 8. invariant banner + charts + JSON report (server-trusted provenance/modelId; client labels ignored)
+
+Token issuance precedes the browser approval click, and the server
+validates the token when the user requests execution. This order does
+not mean the browser click is cryptographically authenticated as an
+identity assertion.
 
 ## 4. Safety
 
@@ -65,8 +82,12 @@ automation, no Playwright. Provenance and rate limiting are server-side
 controls, not cross-machine security boundaries: loopback-only binding
 plus Host/Origin checks do not authenticate arbitrary local processes,
 and the in-memory rate limit is not a durable spending cap.
-No arbitrary code: fixed switch only. Server-issued authorization is
-invalidated on requirement/plan change and expires after 15 minutes.
+No arbitrary code: fixed switch only. The model proposes a bounded
+plan but never executes code. The planner prompt explicitly requests a
+cumulative refund-cap violation scenario using predefined operations,
+so the model did not independently discover an unknown defect.
+Server-issued authorization is invalidated on requirement/plan change
+and expires after 15 minutes.
 Gate enforced twice (interpret + run). JSON bodies capped at 64 KiB.
 Secrets never printed. .env.local never committed.
 
@@ -79,6 +100,8 @@ buildRefundPrompt() includes only requirement + catalogDescription() +
 
 metaClient.js adapted from companion workcadence-meta-hackathon; see
 docs/HACKATHON_DISCLOSURE.md and NEW_WORK.md. All else new for ProofCase.
+Current META provider support was added during the M1/M1.1 migration;
+recorded evidence remains historical Muse Spark Open via Baseten.
 
 ## 7. Deployment
 
